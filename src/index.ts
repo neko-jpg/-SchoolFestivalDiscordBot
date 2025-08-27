@@ -1,127 +1,54 @@
-import { Client, GatewayIntentBits, Collection, Interaction, Partials } from 'discord.js';
-import fs from 'fs';
-import path from 'path';
-import logger from './logger';
-
-// --- Global Error Handlers ---
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error({ reason, promise }, 'Unhandled Rejection');
-});
-process.on('uncaughtException', (error) => {
-  logger.fatal({ err: error }, 'Uncaught Exception, process will exit.');
-  // In a real-world app, you might want to gracefully shut down here before exiting
-  process.exit(1);
-});
-// --- End Global Error Handlers ---
+// src/index.ts
+import { Client, GatewayIntentBits, Collection, Interaction } from 'discord.js';
+import fs from 'fs'; import path from 'path';
 import { env } from './env';
+import logger from './logger';
 import { disconnectPrisma } from './prisma';
-import { executeRollback } from './services/rollbackService';
 
-// Define a type for the client that includes our commands collection
-interface CustomClient extends Client {
-  commands: Collection<string, any>;
-}
+type Command = { data: any; execute: (i: any)=>Promise<void>; autocomplete?: (i:any)=>Promise<void> };
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.DirectMessages, // Required for DMs
-    GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.MessageContent
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
-}) as CustomClient;
+}) as any;
 
-client.commands = new Collection();
+client.commands = new Collection<string, Command>();
 
 const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.ts'));
-
-for (const file of commandFiles) {
+for (const file of fs.readdirSync(commandsPath).filter(f => f.endsWith('.ts') || f.endsWith('.js'))) {
   const filePath = path.join(commandsPath, file);
   try {
-    const command = require(filePath);
-    if ('data' in command && 'execute' in command) {
-      client.commands.set(command.data.name, command);
-    } else {
-      logger.warn({ filePath }, `Command is missing a required "data" or "execute" property.`);
-    }
-  } catch (error) {
-      logger.error({ err: error, filePath }, 'Failed to load command file.');
+    const cmd: Command = require(filePath);
+    if (cmd?.data?.name && typeof cmd.execute === 'function') client.commands.set(cmd.data.name, cmd);
+    else logger.warn({ filePath }, 'Invalid command module shape, skipped');
+  } catch (err) {
+    logger.error({ err, filePath }, 'Failed to load command (skipped)');
   }
 }
 
-client.once('ready', () => {
-  if (client.user) {
-    logger.info({ user: client.user.tag }, 'Ready! Logged in.');
-  } else {
-    logger.warn('Ready, but client.user is not available.');
-  }
-});
-
+client.once('ready', () => logger.info({ user: client.user?.tag }, 'Ready! Logged in'));
 client.on('interactionCreate', async (interaction: Interaction) => {
   if (interaction.isChatInputCommand()) {
-    const command = client.commands.get(interaction.commandName);
-
-    if (!command) {
-      logger.error({ commandName: interaction.commandName }, 'No command matching was found.');
-      return;
-    }
-
-    try {
-      await command.execute(interaction);
-    } catch (error: any) {
-      logger.error({ err: error, commandName: interaction.commandName, user: interaction.user.id, guild: interaction.guild?.id }, 'Error executing command');
-      const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
-      const reply = { content: `コマンド実行中にエラーが発生しました:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(reply);
-      } else {
-        await interaction.reply(reply);
-      }
+    const cmd: Command | undefined = client.commands.get(interaction.commandName);
+    if (!cmd) return;
+    try { await cmd.execute(interaction); }
+    catch (err: any) {
+      logger.error({ err, command: interaction.commandName }, 'Command failed');
+      const msg = (err?.code ? `[${err.code}] ` : '') + (err?.message ?? String(err));
+      const payload = { content: `❌ Error:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
+      if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
+      else await interaction.reply(payload);
     }
   } else if (interaction.isAutocomplete()) {
-    const command = client.commands.get(interaction.commandName);
-    if (!command) {
-        logger.error({ commandName: interaction.commandName }, 'No command matching was found for autocomplete.');
-        return;
-    }
-    try {
-        if (command.autocomplete) {
-            await command.autocomplete(interaction);
-        }
-    } catch (error) {
-        logger.error({ err: error, commandName: interaction.commandName }, 'Error executing autocomplete.');
-    }
-  } else if (interaction.isButton()) {
-    if (interaction.customId.startsWith('build-undo-')) {
-      if (!interaction.guild) {
-          await interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
-          return;
-      }
-
-      const buildRunId = interaction.customId.split('-')[2];
-
-      try {
-        await interaction.update({ content: '🔄 Rolling back changes...', components: [] });
-        await executeRollback(buildRunId, interaction.guild);
-        await interaction.editReply({ content: '✅ Rollback successful.' });
-      } catch (error: any) {
-        logger.error({ err: error, buildRunId, user: interaction.user.id, guild: interaction.guild.id }, 'Error during build rollback');
-        await interaction.editReply({ content: `❌ An error occurred during rollback: ${error.message}` });
-      }
-    }
+    const cmd: Command | undefined = client.commands.get(interaction.commandName);
+    if (cmd?.autocomplete) try { await cmd.autocomplete(interaction); } catch (e) { logger.error({ e }, 'Autocomplete failed'); }
   }
 });
 
 client.login(env.DISCORD_TOKEN);
-
-process.on('SIGINT', async () => {
-  logger.info('Received SIGINT. Shutting down gracefully...');
-  await disconnectPrisma();
-  client.destroy();
-  logger.info('Clients disconnected. Exiting.');
-  process.exit(0);
-});
+process.on('SIGINT', async () => { await disconnectPrisma(); client.destroy(); process.exit(0); });

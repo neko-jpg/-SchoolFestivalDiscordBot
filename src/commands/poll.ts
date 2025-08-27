@@ -1,108 +1,101 @@
-import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, TextChannel } from 'discord.js';
-import logger from '../logger';
+// src/commands/poll.ts
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 
-const choiceEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+const choiceEmojis = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('poll')
-    .setDescription('Creates and manages polls.')
-    .addSubcommand(subcommand => {
-      subcommand
-        .setName('create')
-        .setDescription('Creates a new poll.')
-        .addStringOption(option => option.setName('question').setDescription('The poll question').setRequired(true));
-      // Add up to 10 choices
-      for (let i = 1; i <= 10; i++) {
-        subcommand.addStringOption(option => option.setName(`choice${i}`).setDescription(`Choice ${i}`).setRequired(i <= 2));
-      }
-      return subcommand;
-    })
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('close')
-        .setDescription('Closes a poll and shows the results.')
-        .addStringOption(option => option.setName('message_id').setDescription('The message ID of the poll to close').setRequired(true))
+    .setDescription('投票を作成・集計します')
+    .addSubcommand(sc =>
+      sc.setName('create')
+        .setDescription('投票を作成')
+        .addStringOption(o => o.setName('question').setDescription('質問').setRequired(true))
+        .addStringOption(o => o.setName('choice1').setDescription('選択肢1').setRequired(true))
+        .addStringOption(o => o.setName('choice2').setDescription('選択肢2').setRequired(true))
+        .addStringOption(o => o.setName('choice3').setDescription('選択肢3'))
+        .addStringOption(o => o.setName('choice4').setDescription('選択肢4'))
+        .addStringOption(o => o.setName('choice5').setDescription('選択肢5'))
+        .addStringOption(o => o.setName('choice6').setDescription('選択肢6'))
+        .addStringOption(o => o.setName('choice7').setDescription('選択肢7'))
+        .addStringOption(o => o.setName('choice8').setDescription('選択肢8'))
+        .addStringOption(o => o.setName('choice9').setDescription('選択肢9'))
+        .addStringOption(o => o.setName('choice10').setDescription('選択肢10'))
+    )
+    .addSubcommand(sc =>
+      sc.setName('close')
+        .setDescription('投票を締め切って結果を表示')
+        .addStringOption(o => o.setName('message_id').setDescription('投票メッセージID').setRequired(true))
     ),
-  async execute(interaction: CommandInteraction) {
-    if (!interaction.isChatInputCommand() || !interaction.channel) return;
 
-    const subcommand = interaction.options.getSubcommand();
+  async execute(interaction: ChatInputCommandInteraction) {
+    if (!interaction.inGuild()) return;
 
-    try {
-      if (subcommand === 'create') {
-        const question = interaction.options.getString('question', true);
-        const choices = [];
-        for (let i = 1; i <= 10; i++) {
-          const choice = interaction.options.getString(`choice${i}`);
-          if (choice) {
-            choices.push(choice);
-          }
-        }
+    const sub = interaction.options.getSubcommand();
 
-        const embed = new EmbedBuilder()
-          .setColor('#3498DB')
-          .setTitle(question)
-          .setDescription(choices.map((c, i) => `${choiceEmojis[i]} ${c}`).join('\n'));
-
-        const pollMessage = await interaction.reply({ embeds: [embed], fetchReply: true });
-
-        for (let i = 0; i < choices.length; i++) {
-          await pollMessage.react(choiceEmojis[i]);
-        }
-      } else if (subcommand === 'close') {
-        const messageId = interaction.options.getString('message_id', true);
-
-        const pollMessage = await interaction.channel.messages.fetch(messageId);
-        if (!pollMessage || pollMessage.author.id !== interaction.client.user.id) {
-            await interaction.reply({ content: 'Could not find a valid poll with that message ID.', ephemeral: true});
-            return;
-        }
-
-        const pollEmbed = pollMessage.embeds[0];
-        if (!pollEmbed) {
-            await interaction.reply({ content: 'The specified message does not contain a valid poll embed.', ephemeral: true});
-            return;
-        }
-
-        const results = [];
-        const choices = pollEmbed.description?.split('\n') || [];
-
-        for (const line of choices) {
-            const parts = line.trim().split(' ');
-            if (parts.length < 2) continue;
-
-            const emoji = parts[0];
-            const choiceText = parts.slice(1).join(' ');
-
-            if (choiceEmojis.includes(emoji)) {
-                const reaction = pollMessage.reactions.cache.get(emoji);
-                const count = reaction ? reaction.count - 1 : 0; // Subtract bot's own reaction
-                results.push({ choice: choiceText, emoji: emoji, count });
-            }
-        }
-
-        results.sort((a, b) => b.count - a.count);
-
-        const resultsEmbed = new EmbedBuilder()
-            .setColor('#992D22')
-            .setTitle(`Results for: ${pollEmbed.title}`)
-            .setDescription(results.length > 0 ? results.map(r => `${r.emoji} ${r.choice}: **${r.count} votes**`).join('\n') : 'No votes were cast.');
-
-        await interaction.reply({ embeds: [resultsEmbed] });
-
-        const closedEmbed = EmbedBuilder.from(pollEmbed).setFooter({text: 'This poll is now closed.'});
-        await pollMessage.edit({ embeds: [closedEmbed], components: [] });
+    if (sub === 'create') {
+      const question = interaction.options.getString('question', true);
+      const choices: string[] = [];
+      for (let i = 1; i <= 10; i++) {
+        const c = interaction.options.getString(`choice${i}`);
+        if (c) choices.push(c);
       }
-    } catch (error: any) {
-      logger.error({ err: error, subcommand, user: interaction.user.id }, 'Poll command failed');
-      const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
-      const replyPayload = { content: `An error occurred while handling the poll:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(replyPayload);
-      } else {
-        await interaction.reply(replyPayload);
+      if (choices.length < 2) {
+        await interaction.reply({ content: '少なくとも2つの選択肢が必要です。', ephemeral: true });
+        return;
       }
+
+      const embed = new EmbedBuilder()
+        .setColor(0x3498DB)
+        .setTitle(question)
+        .setDescription(choices.map((c, i) => `${choiceEmojis[i]} ${c}`).join('\n'));
+
+      const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
+      for (let i = 0; i < choices.length; i++) { await msg.react(choiceEmojis[i]); }
+
+    } else if (sub === 'close') {
+      const messageId = interaction.options.getString('message_id', true);
+      const pollMessage = await interaction.channel!.messages.fetch(messageId).catch(() => null);
+
+      if (!pollMessage || pollMessage.author.id !== interaction.client.user!.id) {
+        await interaction.reply({ content: '有効な投票メッセージが見つかりません。', ephemeral: true });
+        return;
+      }
+
+      const pollEmbed = pollMessage.embeds[0];
+      if (!pollEmbed?.description) {
+        await interaction.reply({ content: '投票の埋め込みが見つかりません。', ephemeral: true });
+        return;
+      }
+
+      const lines = pollEmbed.description.split('\n');
+      const results: { emoji: string; choice: string; count: number }[] = [];
+
+      for (const line of lines) {
+        const [emoji, ...rest] = line.trim().split(' ');
+        const choiceText = rest.join(' ');
+        if (!choiceEmojis.includes(emoji)) continue;
+
+        const reaction = pollMessage.reactions.resolve(emoji) ?? pollMessage.reactions.cache.get(emoji);
+        const count = reaction ? Math.max(0, reaction.count - 1) : 0; // Botの初期リアクション分を差し引く
+        results.push({ emoji, choice: choiceText, count });
+      }
+
+      results.sort((a, b) => b.count - a.count);
+
+      const resultEmbed = new EmbedBuilder()
+        .setColor(0x992D22)
+        .setTitle(`結果: ${pollEmbed.title ?? '投票'}`)
+        .setDescription(
+          results.length
+            ? results.map(r => `${r.emoji} ${r.choice}: **${r.count}票**`).join('\n')
+            : '投票はありませんでした。'
+        );
+
+      await interaction.reply({ embeds: [resultEmbed] });
+
+      const closed = EmbedBuilder.from(pollEmbed).setFooter({ text: 'この投票は締め切られました。' });
+      await pollMessage.edit({ embeds: [closed], components: [] }).catch(() => {});
     }
   },
 };
