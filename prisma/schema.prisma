@@ -43,3 +43,20 @@ model LostItem {
   status        String   @default("保管中") // "保管中" or "返却済"
   createdAt     DateTime @default(now())
 }
+
+model Knowledge {
+  id        String   @id @default(cuid())
+  keyword   String   @unique
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model CongestionReport {
+  id        String   @id @default(cuid())
+  location  String
+  level     Int      // e.g., 1 for low, 2 for medium, 3 for high
+  reporterId String
+  createdAt DateTime @default(now())
+
+  @@index([location, createdAt])
+}
