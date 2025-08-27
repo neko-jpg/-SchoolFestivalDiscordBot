@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, Interaction } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, Interaction, Partials } from 'discord.js';
 import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -16,7 +16,10 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages, // Required for DMs
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildMembers,
   ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 }) as CustomClient;
 
 client.commands = new Collection();
@@ -55,9 +58,10 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
     try {
       await command.execute(interaction);
-    } catch (error) {
-      console.error(error);
-      const reply = { content: 'There was an error while executing this command!', ephemeral: true };
+    } catch (error: any) {
+      console.error(`[${interaction.commandName}]`, error);
+      const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
+      const reply = { content: `コマンド実行中にエラーが発生しました:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(reply);
       } else {

@@ -1,21 +1,31 @@
-import { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits, SlashCommandStringOption } from 'discord.js';
 import getPrisma from '../prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as kuromoji from 'kuromoji';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// --- Kuromoji Tokenizer Initialization ---
+// --- Kuromoji Tokenizer Initialization (Lazy) ---
 let tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures> | null = null;
-console.log('Building Kuromoji tokenizer...');
-kuromoji.builder({ dicPath: 'node_modules/kuromoji/dict' }).build((err, t) => {
-    if (err) {
-        console.error('FATAL: Failed to build kuromoji tokenizer. The /ask command will not work.', err);
-    } else {
-        tokenizer = t;
+async function getTokenizer() {
+  if (tokenizer) {
+    return tokenizer;
+  }
+
+  console.log('Building Kuromoji tokenizer for the first time...');
+  return new Promise<kuromoji.Tokenizer<kuromoji.IpadicFeatures>>((resolve, reject) => {
+    kuromoji.builder({ dicPath: 'node_modules/kuromoji/dict' }).build((err, builtTokenizer) => {
+      if (err) {
+        console.error('FATAL: Failed to build kuromoji tokenizer.', err);
+        reject(err);
+      } else {
+        tokenizer = builtTokenizer;
         console.log('Kuromoji tokenizer built successfully.');
-    }
-});
+        resolve(builtTokenizer);
+      }
+    });
+  });
+}
 // --- End Kuromoji Initialization ---
 
 
@@ -27,7 +37,7 @@ module.exports = {
       subcommand
         .setName('question')
         .setDescription('Ask a question to the AI assistant.')
-        .addStringOption(option => option.setName('query').setDescription('Your question').setRequired(true))
+        .addStringOption((option: SlashCommandStringOption) => option.setName('query').setDescription('Your question').setRequired(true))
     )
     .addSubcommand(subcommand =>
       subcommand
@@ -65,12 +75,10 @@ module.exports = {
         await interaction.deferReply();
         const query = interaction.options.getString('query', true);
 
-        if (!tokenizer) {
-            return interaction.editReply('The AI is still warming up (the tokenizer is not ready). Please try again in a moment.');
-        }
+        const localTokenizer = await getTokenizer();
 
         // Use Kuromoji to extract meaningful keywords (nouns, verbs)
-        const tokens = tokenizer.tokenize(query);
+        const tokens = localTokenizer.tokenize(query);
         const queryKeywords = tokens
             .filter(token => token.pos === '名詞' || token.pos === '動詞')
             .map(token => token.surface_form);
@@ -100,9 +108,15 @@ module.exports = {
 
         await interaction.editReply(answer);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('AI Help Desk error:', error);
-      await interaction.followUp({ content: 'An error occurred with the AI Help Desk.', ephemeral: true });
+      const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
+      const replyPayload = { content: `AIヘルプデスクでエラーが発生しました:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(replyPayload);
+      } else {
+        await interaction.reply(replyPayload);
+      }
     }
   },
 };

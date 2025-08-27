@@ -46,9 +46,16 @@ export async function executeBuild(guild: Guild, diff: DiffResult, currentState:
         },
     });
 
-    try {
-        // --- Role Changes ---
-        for (const roleToCreate of diff.roles.toCreate) {
+    const failures: string[] = [];
+
+    // --- Role Creation ---
+    for (const roleToCreate of diff.roles.toCreate) {
+        try {
+            const existingRole = guild.roles.cache.find(r => r.name === roleToCreate.name);
+            if (existingRole) {
+                failures.push(`Role '${roleToCreate.name}' already exists, skipping creation.`);
+                continue;
+            }
             await guild.roles.create({
                 name: roleToCreate.name,
                 color: roleToCreate.color ? hexToNumber(roleToCreate.color) : undefined,
@@ -56,31 +63,56 @@ export async function executeBuild(guild: Guild, diff: DiffResult, currentState:
                 mentionable: roleToCreate.mentionable,
                 permissions: [],
             });
+        } catch (e: any) {
+            failures.push(`Failed to create role '${roleToCreate.name}': [${e.code}] ${e.message}`);
         }
-        for (const roleToUpdate of diff.roles.toUpdate) {
-             await guild.roles.edit(roleToUpdate.existing.id, {
+    }
+
+    // --- Role Updates ---
+    for (const roleToUpdate of diff.roles.toUpdate) {
+        try {
+            await guild.roles.edit(roleToUpdate.existing.id, {
                 color: roleToUpdate.changes.color ? hexToNumber(roleToUpdate.changes.color) : undefined,
                 hoist: roleToUpdate.changes.hoist,
-                mentionable: roleToUpdate.changes.mentionable
+                mentionable: roleToUpdate.changes.mentionable,
             });
+        } catch (e: any) {
+            failures.push(`Failed to update role '${roleToUpdate.existing.name}': [${e.code}] ${e.message}`);
         }
+    }
 
-        // --- Category and Channel Changes ---
-        const createdCategories = new Map<string, string>();
-        for (const categoryToCreate of diff.categories.toCreate) {
-            const newCategory = await guild.channels.create({
-                name: categoryToCreate.name,
-                type: ChannelType.GuildCategory,
-            });
+    await guild.roles.fetch(); // Re-fetch roles to ensure cache is up-to-date for permission overwrites
+
+    // --- Category and Channel Changes ---
+    const createdCategories = new Map<string, string>();
+    for (const categoryToCreate of diff.categories.toCreate) {
+        try {
+            const existingCategory = guild.channels.cache.find(c => c.name === categoryToCreate.name && c.type === ChannelType.GuildCategory);
+            if (existingCategory) {
+                failures.push(`Category '${categoryToCreate.name}' already exists, skipping creation.`);
+                createdCategories.set(categoryToCreate.name, existingCategory.id);
+                continue;
+            }
+            const newCategory = await guild.channels.create({ name: categoryToCreate.name, type: ChannelType.GuildCategory });
             createdCategories.set(categoryToCreate.name, newCategory.id);
+        } catch (e: any) {
+            failures.push(`Failed to create category '${categoryToCreate.name}': [${e.code}] ${e.message}`);
         }
+    }
 
-        for (const channelToCreate of diff.channels.toCreate) {
+    for (const channelToCreate of diff.channels.toCreate) {
+        try {
+            const existingChannel = guild.channels.cache.find(c => c.name === channelToCreate.channel.name && c.type !== ChannelType.GuildCategory);
+            if (existingChannel) {
+                failures.push(`Channel '#${channelToCreate.channel.name}' already exists, skipping creation.`);
+                continue;
+            }
+
             const parentCategory = guild.channels.cache.find(c => c.name === channelToCreate.categoryName && c.type === ChannelType.GuildCategory);
             const parentId = parentCategory?.id ?? createdCategories.get(channelToCreate.categoryName);
 
             if (!parentId) {
-                console.warn(`Could not find parent category for '#${channelToCreate.channel.name}'. Skipping.`);
+                failures.push(`Could not find parent category for '#${channelToCreate.channel.name}'. Skipping.`);
                 continue;
             }
 
@@ -92,33 +124,30 @@ export async function executeBuild(guild: Guild, diff: DiffResult, currentState:
                 parent: parentId,
                 permissionOverwrites,
             });
+        } catch (e: any) {
+            failures.push(`Failed to create channel '#${channelToCreate.channel.name}': [${e.code}] ${e.message}`);
         }
+    }
 
-        for (const channelToUpdate of diff.channels.toUpdate) {
+    for (const channelToUpdate of diff.channels.toUpdate) {
+        try {
             const channel = guild.channels.cache.get(channelToUpdate.existing.id);
             if (channel && 'edit' in channel) {
-                const newOverwrites = channelToUpdate.changes.overwrites
-                    ? await mapOverwrites(guild, channelToUpdate.changes.overwrites)
-                    : undefined;
-
-                await channel.edit({
-                    topic: channelToUpdate.changes.topic,
-                    permissionOverwrites: newOverwrites,
-                });
+                const newOverwrites = channelToUpdate.changes.overwrites ? await mapOverwrites(guild, channelToUpdate.changes.overwrites) : undefined;
+                await channel.edit({ topic: channelToUpdate.changes.topic, permissionOverwrites: newOverwrites });
+            } else {
+                failures.push(`Could not find channel '#${channelToUpdate.existing.name}' to update.`);
             }
+        } catch (e: any) {
+            failures.push(`Failed to update channel '#${channelToUpdate.existing.name}': [${e.code}] ${e.message}`);
         }
-
-        const finalBuildRun = await prisma.buildRun.update({
-            where: { id: buildRun.id },
-            data: { status: 'SUCCESS' },
-        });
-        return finalBuildRun;
-
-    } catch (error) {
-        await prisma.buildRun.update({
-            where: { id: buildRun.id },
-            data: { status: 'FAILED' },
-        });
-        throw error;
     }
+
+    const finalStatus = failures.length > 0 ? 'PARTIAL_SUCCESS' : 'SUCCESS';
+    await prisma.buildRun.update({
+        where: { id: buildRun.id },
+        data: { status: finalStatus },
+    });
+
+    return { buildRun, failures };
 }
