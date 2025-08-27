@@ -1,0 +1,37 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "これは、文化祭ディスコードbot作成のためのレポジトリです",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "deploy": "ts-node src/deploy-commands.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neko-jpg/-SchoolFestivalDiscordBot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/neko-jpg/-SchoolFestivalDiscordBot/issues"
+  },
+  "homepage": "https://github.com/neko-jpg/-SchoolFestivalDiscordBot#readme",
+  "dependencies": {
+    "@discordjs/rest": "^2.6.0",
+    "discord.js": "^14.22.1",
+    "dotenv": "^17.2.1",
+    "glob": "^11.0.3",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
