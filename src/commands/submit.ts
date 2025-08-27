@@ -1,39 +1,51 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import { Client as NotionClient } from '@notionhq/client';
+import prisma from '../prisma';
 
 // Initialize Notion Client
 const notion = new NotionClient({ auth: process.env.NOTION_API_KEY });
-const databaseId = process.env.NOTION_DATABASE_ID;
 
-if (!process.env.NOTION_API_KEY || !databaseId) {
-  console.warn('Notion API Key or Database ID not set. The /submit command will be disabled.');
+if (!process.env.NOTION_API_KEY) {
+  console.warn('Notion API Key not set. The /submit command will be disabled.');
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('submit')
-    .setDescription('Manages submissions with Notion.')
+    .setDescription('Notionデータベースと連携して提出物を管理します。')
     .addSubcommand(subcommand =>
       subcommand
         .setName('add')
-        .setDescription('Adds a new submission to the Notion database.')
+        .setDescription('新しい提出物をNotionデータベースに追加します。')
         .addStringOption(option =>
-          option.setName('name').setDescription('The name of the submission').setRequired(true))
+          option.setName('name').setDescription('提出物の名前').setRequired(true))
         .addUserOption(option =>
-          option.setName('owner').setDescription('The user responsible for the submission').setRequired(true))
+          option.setName('owner').setDescription('担当者').setRequired(true))
         .addStringOption(option =>
-          option.setName('duedate').setDescription('The due date (YYYY-MM-DD)').setRequired(true))
+          option.setName('duedate').setDescription('締切日 (YYYY-MM-DD)').setRequired(true))
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('list')
-        .setDescription('Lists all submissions from the Notion database.')
+        .setDescription('Notionデータベースから全ての提出物を一覧表示します。')
     ),
   async execute(interaction: CommandInteraction) {
-    if (!interaction.isChatInputCommand() || !databaseId) {
-        await interaction.reply({ content: 'The Notion integration is not configured. Please contact an administrator.', ephemeral: true });
+    if (!interaction.isChatInputCommand() || !interaction.inGuild()) return;
+
+    if (!process.env.NOTION_API_KEY) {
+      await interaction.reply({ content: 'Notion連携が設定されていません。管理者に連絡してください。', ephemeral: true });
+      return;
+    }
+
+    const config = await prisma.guildConfig.findUnique({
+        where: { guildId: interaction.guildId },
+    });
+
+    if (!config || !config.notionDatabaseId) {
+        await interaction.reply({ content: 'NotionデータベースIDが設定されていません。`/config notion`で設定してください。', ephemeral: true });
         return;
     }
+    const databaseId = config.notionDatabaseId;
 
     try {
       if (interaction.options.getSubcommand() === 'add') {

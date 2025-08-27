@@ -1,18 +1,26 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
-
-const festivalDateStr = process.env.FESTIVAL_START_DATE;
+import prisma from '../prisma';
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('countdown')
-    .setDescription('Shows the countdown to the festival.'),
+    .setDescription('文化祭開催までのカウントダウンを表示します。'),
   async execute(interaction: CommandInteraction) {
-    if (!festivalDateStr) {
-      await interaction.reply({ content: 'The festival start date is not configured.', ephemeral: true });
+    if (!interaction.inGuild()) {
+        await interaction.reply({ content: 'このコマンドはサーバー内でのみ使用できます。', ephemeral: true });
+        return;
+    }
+
+    const config = await prisma.guildConfig.findUnique({
+        where: { guildId: interaction.guildId },
+    });
+
+    if (!config || !config.festivalStartDate) {
+      await interaction.reply({ content: '文化祭の開始日が設定されていません。`/config startdate`で設定してください。', ephemeral: true });
       return;
     }
 
-    const festivalDate = new Date(festivalDateStr);
+    const festivalDate = config.festivalStartDate;
     const now = new Date();
 
     const diff = festivalDate.getTime() - now.getTime();

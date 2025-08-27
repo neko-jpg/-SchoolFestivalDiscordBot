@@ -1,11 +1,9 @@
 import { google } from 'googleapis';
 
-const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
-
 // Helper to get calendar events
-export async function getCalendarEvents() {
-  if (!GOOGLE_CALENDAR_ID || !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    return { error: 'Google Calendar not configured.' };
+export async function getCalendarEvents(calendarId: string) {
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    return { error: 'Google Calendar credentials not configured.' };
   }
   try {
     const auth = new google.auth.GoogleAuth({
@@ -20,7 +18,7 @@ export async function getCalendarEvents() {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const res = await calendar.events.list({
-      calendarId: GOOGLE_CALENDAR_ID,
+      calendarId: calendarId,
       timeMin: today.toISOString(),
       timeMax: tomorrow.toISOString(),
       singleEvents: true,
