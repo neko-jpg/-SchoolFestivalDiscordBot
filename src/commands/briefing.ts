@@ -1,9 +1,8 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import axios from 'axios';
-import { google } from 'googleapis';
+import { getCalendarEvents } from '../utils/googleCalendar';
 
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
-const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 
 // Helper to get weather data
 async function getWeather(location: string = 'Tokyo') {
@@ -19,44 +18,15 @@ async function getWeather(location: string = 'Tokyo') {
   }
 }
 
-// Helper to get calendar events
-async function getCalendarEvents() {
-  if (!GOOGLE_CALENDAR_ID || !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    return 'Google Calendar not configured.';
-  }
-  try {
-    const auth = new google.auth.GoogleAuth({
-      keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-      scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
-    });
-    const calendar = google.calendar({ version: 'v3', auth });
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const res = await calendar.events.list({
-      calendarId: GOOGLE_CALENDAR_ID,
-      timeMin: today.toISOString(),
-      timeMax: tomorrow.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
-
-    const events = res.data.items;
+function formatCalendarEvents(events: any[] | undefined) {
     if (!events || events.length === 0) {
-      return '本日の予定はありません。';
+        return '本日の予定はありません。';
     }
     return events.map(event => {
-      const start = event.start?.dateTime || event.start?.date;
-      const time = start ? new Date(start).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '終日';
-      return `**${time}** - ${event.summary}`;
+        const start = event.start?.dateTime || event.start?.date;
+        const time = start ? new Date(start).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '終日';
+        return `**${time}** - ${event.summary}`;
     }).join('\n');
-  } catch (error) {
-    console.error('Google Calendar API Error:', error);
-    return 'スケジュールを取得できませんでした。';
-  }
 }
 
 
@@ -74,13 +44,12 @@ module.exports = {
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.options.getSubcommand() === 'post') {
-      await interaction.deferReply(); // Defer reply as fetching APIs can take time
+      await interaction.deferReply();
 
-      const [weather, schedule] = await Promise.all([
-        getWeather(),
-        getCalendarEvents()
-      ]);
+      const calendarResult = await getCalendarEvents();
+      const weather = await getWeather();
 
+      const schedule = calendarResult.error ? calendarResult.error : formatCalendarEvents(calendarResult.events);
       const notes = '13時以降は体育館への搬入禁止（静的メッセージ）';
 
       const embed = new EmbedBuilder()

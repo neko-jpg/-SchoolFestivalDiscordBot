@@ -47,5 +47,32 @@ CREATE TABLE "public"."LostItem" (
     CONSTRAINT "LostItem_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "public"."Knowledge" (
+    "id" TEXT NOT NULL,
+    "keyword" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Knowledge_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."CongestionReport" (
+    "id" TEXT NOT NULL,
+    "location" TEXT NOT NULL,
+    "level" INTEGER NOT NULL,
+    "reporterId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CongestionReport_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "InventoryItem_name_key" ON "public"."InventoryItem"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Knowledge_keyword_key" ON "public"."Knowledge"("keyword");
+
+-- CreateIndex
+CREATE INDEX "CongestionReport_location_createdAt_idx" ON "public"."CongestionReport"("location", "createdAt");
