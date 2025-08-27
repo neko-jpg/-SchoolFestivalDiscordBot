@@ -3,19 +3,11 @@ import { ServerTemplate, TemplateCategory, TemplateChannel, TemplateRole, Templa
 import { GuildState, SimpleChannel, SimpleOverwrite, SimpleRole } from './discordService';
 
 // --- Utility Functions ---
-
-/**
- * Converts a hex color string to a decimal number.
- * @param hex The hex color string (e.g., "#RRGGBB").
- * @returns The color as a decimal number.
- */
 function hexToNumber(hex: string): number {
     return parseInt(hex.startsWith('#') ? hex.substring(1) : hex, 16);
 }
 
-
 // --- Diffing Interfaces ---
-
 export interface RoleDiff {
     toCreate: TemplateRole[];
     toUpdate: { existing: SimpleRole; changes: Partial<TemplateRole> }[];
@@ -27,17 +19,9 @@ export interface CategoryDiff {
     toSkip: SimpleChannel[];
 }
 
-export interface OverwriteChanges {
-    roleName: string;
-    addedAllow: string[];
-    removedAllow: string[];
-    addedDeny: string[];
-    removedDeny: string[];
-}
-
 export interface ChannelChanges {
     topic?: string;
-    overwrites?: OverwriteChanges[];
+    overwrites?: TemplateRoleOverwrite[];
 }
 
 export interface ChannelDiff {
@@ -53,13 +37,6 @@ export interface DiffResult {
 }
 
 // --- Main Diffing Logic ---
-
-/**
- * Compares the server template with the current guild state to determine changes.
- * @param currentState The current state of the guild.
- * @param template The desired state from the template file.
- * @returns An object detailing what needs to be created, updated, or skipped.
- */
 export function diffTemplate(currentState: GuildState, template: ServerTemplate): DiffResult {
     const result: DiffResult = {
         roles: { toCreate: [], toUpdate: [], toSkip: [] },
@@ -79,13 +56,11 @@ function diffRoles(currentState: GuildState, template: ServerTemplate, result: D
         if (!existingRole) {
             result.roles.toCreate.push(templateRole);
         } else {
-            // For now, we just check for existence. Update logic will be added later.
-            // A simple check for color difference:
             const changes: Partial<TemplateRole> = {};
             if (templateRole.color && hexToNumber(templateRole.color) !== existingRole.color) {
                 changes.color = templateRole.color;
             }
-             if (templateRole.hoist !== undefined && templateRole.hoist !== existingRole.hoist) {
+            if (templateRole.hoist !== undefined && templateRole.hoist !== existingRole.hoist) {
                 changes.hoist = templateRole.hoist;
             }
             if (templateRole.mentionable !== undefined && templateRole.mentionable !== existingRole.mentionable) {
@@ -101,33 +76,31 @@ function diffRoles(currentState: GuildState, template: ServerTemplate, result: D
     });
 }
 
-function diffOverwrites(templateOverwrites: TemplateRoleOverwrite[] = [], existingOverwrites: SimpleOverwrite[] = []): OverwriteChanges[] {
-    const changes: OverwriteChanges[] = [];
-    const tplMap = new Map(templateOverwrites.map(o => [o.role, o]));
-    const existingMap = new Map(existingOverwrites.map(o => [o.roleName, o]));
+function areOverwritesEqual(templateOverwrites: TemplateRoleOverwrite[] = [], existingOverwrites: SimpleOverwrite[] = []): boolean {
+    if (templateOverwrites.length !== existingOverwrites.length) return false;
 
-    const allRoleNames = new Set([...tplMap.keys(), ...existingMap.keys()]);
-
-    allRoleNames.forEach(roleName => {
-        const tplO = tplMap.get(roleName);
-        const existingO = existingMap.get(roleName);
-
-        const tplAllow = new Set(tplO?.allow || []);
-        const tplDeny = new Set(tplO?.deny || []);
-        const existingAllow = new Set(existingO?.allow || []);
-        const existingDeny = new Set(existingO?.deny || []);
-
-        const addedAllow = [...tplAllow].filter(p => !existingAllow.has(p));
-        const removedAllow = [...existingAllow].filter(p => !tplAllow.has(p));
-        const addedDeny = [...tplDeny].filter(p => !existingDeny.has(p));
-        const removedDeny = [...existingDeny].filter(p => !tplDeny.has(p));
-
-        if (addedAllow.length > 0 || removedAllow.length > 0 || addedDeny.length > 0 || removedDeny.length > 0) {
-            changes.push({ roleName, addedAllow, removedAllow, addedDeny, removedDeny });
-        }
+    const existingMap = new Map<string, { allow: Set<string>, deny: Set<string> }>();
+    existingOverwrites.forEach(o => {
+        existingMap.set(o.roleName, {
+            allow: new Set(o.allow),
+            deny: new Set(o.deny),
+        });
     });
 
-    return changes;
+    for (const tplOverwrite of templateOverwrites) {
+        const existingO = existingMap.get(tplOverwrite.role);
+        if (!existingO) return false;
+
+        const tplAllow = new Set(tplOverwrite.allow || []);
+        const tplDeny = new Set(tplOverwrite.deny || []);
+
+        if (tplAllow.size !== existingO.allow.size || tplDeny.size !== existingO.deny.size) return false;
+
+        for (const p of tplAllow) if (!existingO.allow.has(p)) return false;
+        for (const p of tplDeny) if (!existingO.deny.has(p)) return false;
+    }
+
+    return true;
 }
 
 function diffCategoriesAndChannels(currentState: GuildState, template: ServerTemplate, result: DiffResult) {
@@ -147,13 +120,11 @@ function diffCategoriesAndChannels(currentState: GuildState, template: ServerTem
     template.categories?.forEach(templateCategory => {
         const existingCategory = existingCategories.get(templateCategory.name);
         if (!existingCategory) {
-            // If category doesn't exist, all its channels are new
             result.categories.toCreate.push(templateCategory);
             templateCategory.channels.forEach(channel => {
                 result.channels.toCreate.push({ channel, categoryName: templateCategory.name });
             });
         } else {
-            // Category exists, so skip it and diff its channels
             result.categories.toSkip.push(existingCategory);
             const childChannels = existingChannelsByParent.get(existingCategory.id) || [];
             const childChannelsMap = new Map(childChannels.map(c => [c.name, c]));
@@ -166,16 +137,13 @@ function diffCategoriesAndChannels(currentState: GuildState, template: ServerTem
                     const changes: ChannelChanges = {};
                     let hasChanges = false;
 
-                    // Compare topic
                     if (templateChannel.topic !== undefined && templateChannel.topic !== existingChannel.topic) {
                         changes.topic = templateChannel.topic;
                         hasChanges = true;
                     }
 
-                    // Compare overwrites
-                    const overwriteChanges = diffOverwrites(templateChannel.overwrites, existingChannel.overwrites);
-                    if (overwriteChanges.length > 0) {
-                        changes.overwrites = overwriteChanges;
+                    if (!areOverwritesEqual(templateChannel.overwrites, existingChannel.overwrites)) {
+                        changes.overwrites = templateChannel.overwrites;
                         hasChanges = true;
                     }
 

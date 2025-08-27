@@ -1,24 +1,20 @@
 import { Guild, OverwriteResolvable, PermissionsString } from 'discord.js';
 import prisma from '../prisma';
 import { DiffResult } from './diffService';
-import { GuildState, SimpleOverwrite } from './discordService';
+import { SimpleOverwrite } from './discordService';
 
 async function mapOverwritesFromSnapshot(guild: Guild, snapshotOverwrites: SimpleOverwrite[] = []): Promise<OverwriteResolvable[]> {
     const results: OverwriteResolvable[] = [];
     await guild.roles.fetch();
 
     for (const overwrite of snapshotOverwrites) {
-        let roleId: string | undefined;
-        if (overwrite.roleName === '@everyone') {
-            roleId = guild.roles.everyone.id;
-        } else {
-            const role = guild.roles.cache.find(r => r.name === overwrite.roleName);
-            roleId = role?.id;
-        }
+        const role = overwrite.roleName === '@everyone'
+            ? guild.roles.everyone
+            : guild.roles.cache.find(r => r.name === overwrite.roleName);
 
-        if (roleId) {
+        if (role) {
             results.push({
-                id: roleId,
+                id: role.id,
                 allow: overwrite.allow as PermissionsString[],
                 deny: overwrite.deny as PermissionsString[],
             });
@@ -33,69 +29,54 @@ async function mapOverwritesFromSnapshot(guild: Guild, snapshotOverwrites: Simpl
  * @param guild The guild where the rollback should occur.
  */
 export async function executeRollback(buildRunId: string, guild: Guild) {
-    // 1. Fetch the BuildRun record
-    const buildRun = await prisma.buildRun.findUnique({
-        where: { id: buildRunId },
-    });
+    const buildRun = await prisma.buildRun.findUnique({ where: { id: buildRunId } });
 
-    if (!buildRun) {
-        throw new Error('Build run not found.');
-    }
-    if (buildRun.status === 'ROLLED_BACK') {
-        throw new Error('This build has already been rolled back.');
-    }
+    if (!buildRun) throw new Error('Build run not found.');
+    if (buildRun.status === 'ROLLED_BACK') throw new Error('This build has already been rolled back.');
 
-    // 2. Parse the stored JSON data
-    // It's important that the shapes match the original interfaces.
-    // The maps from the original objects were lost during JSON serialization.
     const snapshot = buildRun.snapshot as any;
     const diff = buildRun.dryRunResult as DiffResult;
+    const snapshotRoles = new Map<string, any>((snapshot.roles || []).map((r: any) => [r.id, r]));
+    const snapshotChannels = new Map<string, any>((snapshot.channels || []).map((c: any) => [c.id, c]));
 
-    // --- Reversal Phase ---
-    // Order: Channels -> Categories -> Roles
-
-    // 3. Revert Channel Changes
+    // Revert Channels & Categories
     for (const channelData of diff.channels.toCreate) {
         const channel = guild.channels.cache.find(c => c.name === channelData.channel.name);
-        if (channel) await channel.delete();
+        if (channel) await channel.delete().catch(e => console.error(`Failed to delete channel ${channel.name}:`, e));
+    }
+    for (const categoryData of diff.categories.toCreate) {
+        const category = guild.channels.cache.find(c => c.name === categoryData.name);
+        if (category) await category.delete().catch(e => console.error(`Failed to delete category ${category.name}:`, e));
     }
     for (const channelData of diff.channels.toUpdate) {
-        const originalChannel = snapshot.channels.find((c: any) => c.id === channelData.existing.id);
+        const originalChannel = snapshotChannels.get(channelData.existing.id);
         const liveChannel = guild.channels.cache.get(channelData.existing.id);
-
         if (originalChannel && liveChannel && 'edit' in liveChannel) {
             const originalOverwrites = await mapOverwritesFromSnapshot(guild, originalChannel.overwrites);
             await liveChannel.edit({
                 topic: originalChannel.topic,
                 permissionOverwrites: originalOverwrites,
-            });
+            }).catch(e => console.error(`Failed to revert channel ${liveChannel.name}:`, e));
         }
     }
 
-    // 4. Revert Category Changes
-    for (const categoryData of diff.categories.toCreate) {
-        const category = guild.channels.cache.find(c => c.name === categoryData.name);
-        if (category) await category.delete();
-    }
-
-    // 5. Revert Role Changes
+    // Revert Roles
     for (const roleData of diff.roles.toCreate) {
         const role = guild.roles.cache.find(r => r.name === roleData.name);
-        if (role) await role.delete();
+        if (role) await role.delete().catch(e => console.error(`Failed to delete role ${role.name}:`, e));
     }
     for (const roleData of diff.roles.toUpdate) {
-        const originalRole = snapshot.roles.find((r: any) => r.id === roleData.existing.id);
+        const originalRole = snapshotRoles.get(roleData.existing.id);
         if (originalRole) {
             await guild.roles.edit(roleData.existing.id, {
                 name: originalRole.name,
                 color: originalRole.color,
                 hoist: originalRole.hoist,
                 mentionable: originalRole.mentionable,
-            });
+            }).catch(e => console.error(`Failed to revert role ${originalRole.name}:`, e));
         }
     }
 
-    // 6. Mark the build as rolled back
     await prisma.buildRun.update({
         where: { id: buildRunId },
         data: { status: 'ROLLED_BACK' },

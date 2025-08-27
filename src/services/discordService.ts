@@ -7,6 +7,7 @@ export interface SimpleRole {
     color: number;
     hoist: boolean;
     mentionable: boolean;
+    position: number;
 }
 
 export interface SimpleOverwrite {
@@ -22,6 +23,7 @@ export interface SimpleChannel {
     type: ChannelType.GuildText | ChannelType.GuildVoice | ChannelType.GuildCategory;
     topic?: string | null;
     parentId: string | null;
+    position: number;
     overwrites: SimpleOverwrite[];
 }
 
@@ -45,7 +47,7 @@ export async function getGuildState(guild: Guild): Promise<GuildState> {
     // 1. Fetch all roles from the guild
     const guildRoles = await guild.roles.fetch();
     guildRoles.forEach(role => {
-        // We ignore the @everyone role as it's not typically managed by templates in this way
+        // We ignore the @everyone role unless it's explicitly managed in overwrites
         if (role.name !== '@everyone') {
             state.roles.set(role.name, {
                 id: role.id,
@@ -53,6 +55,7 @@ export async function getGuildState(guild: Guild): Promise<GuildState> {
                 color: role.color,
                 hoist: role.hoist,
                 mentionable: role.mentionable,
+                position: role.position,
             });
         }
     });
@@ -60,19 +63,16 @@ export async function getGuildState(guild: Guild): Promise<GuildState> {
     // Create a map of role IDs to names for easy lookup
     const roleIdToName = new Map<string, string>();
     guildRoles.forEach(role => roleIdToName.set(role.id, role.name));
-    // Also add @everyone
     const everyoneRole = guild.roles.everyone;
     roleIdToName.set(everyoneRole.id, everyoneRole.name);
 
     // 2. Fetch all channels from the guild
     const guildChannels = await guild.channels.fetch();
     guildChannels.forEach(channel => {
-        // We only care about text, voice, and category channels as defined in the template
         if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildCategory)) {
 
             const simpleOverwrites: SimpleOverwrite[] = [];
             channel.permissionOverwrites.cache.forEach(overwrite => {
-                // We only care about role overwrites for now
                 if (overwrite.type === 0) { // 0 for 'role'
                     const roleName = roleIdToName.get(overwrite.id);
                     if (roleName) {
@@ -91,6 +91,7 @@ export async function getGuildState(guild: Guild): Promise<GuildState> {
                 type: channel.type,
                 topic: channel.type === ChannelType.GuildText ? channel.topic : null,
                 parentId: channel.parentId,
+                position: channel.position,
                 overwrites: simpleOverwrites,
             });
         }

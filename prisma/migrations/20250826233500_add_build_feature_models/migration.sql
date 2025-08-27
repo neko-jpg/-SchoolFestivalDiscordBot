@@ -1,4 +1,3 @@
--- CreateSchema
 -- CreateTable
 CREATE TABLE "public"."Template" (
     "id" TEXT NOT NULL,
