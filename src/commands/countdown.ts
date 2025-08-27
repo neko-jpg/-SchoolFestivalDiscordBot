@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import { fromZonedTime } from 'date-fns-tz';
 import getPrisma from '../prisma';
+import { env } from '../env';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,7 +18,7 @@ module.exports = {
         where: { guildId: interaction.guildId },
     });
 
-    const festivalDateFromEnv = process.env.FESTIVAL_START_DATE;
+    const festivalDateFromEnv = env.FESTIVAL_START_DATE;
     const festivalDateFromDb = config?.festivalStartDate;
 
     if (!festivalDateFromDb && !festivalDateFromEnv) {
