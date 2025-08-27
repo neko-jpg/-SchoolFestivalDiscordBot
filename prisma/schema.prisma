@@ -17,3 +17,29 @@ model Shift {
   location  String
   assignees Json
 }
+
+model InventoryItem {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  quantity    Int
+  checkouts   Json    @default("[]")
+}
+
+model Kudos {
+  id         String   @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  message    String
+  createdAt  DateTime @default(now())
+}
+
+model LostItem {
+  id            String   @id @default(cuid())
+  itemName      String
+  foundLocation String
+  imageUrl      String?
+  reportedById  String
+  status        String   @default("保管中") // "保管中" or "返却済"
+  createdAt     DateTime @default(now())
+}
