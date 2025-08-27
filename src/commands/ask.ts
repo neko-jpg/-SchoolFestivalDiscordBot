@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits, SlashCommandStringOption } from 'discord.js';
 import getPrisma from '../prisma';
+import { requireGuildId } from '../lib/context';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as kuromoji from 'kuromoji';
 import { env } from '../env';
@@ -52,6 +53,7 @@ module.exports = {
     if (!interaction.isChatInputCommand()) return;
 
     const prisma = getPrisma();
+    const gid = requireGuildId(interaction.guildId);
     const subcommand = interaction.options.getSubcommand();
 
     try {
@@ -63,9 +65,9 @@ module.exports = {
         const content = interaction.options.getString('content', true);
 
         await prisma.knowledge.upsert({
-            where: { keyword: keyword },
-            update: { content: content },
-            create: { keyword: keyword, content: content },
+            where: { guildId_keyword: { guildId: gid, keyword } },
+            update: { content },
+            create: { guildId: gid, keyword, content },
         });
 
         await interaction.reply({ content: `I've remembered about "${keyword}".`, ephemeral: true });
@@ -91,6 +93,7 @@ module.exports = {
 
         const contextRecords = await prisma.knowledge.findMany({
             where: {
+                guildId: gid,
                 OR: queryKeywords.map(kw => ({
                     OR: [
                         { keyword: { contains: kw, mode: 'insensitive' } },

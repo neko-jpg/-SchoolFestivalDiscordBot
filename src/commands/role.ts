@@ -2,6 +2,7 @@ import { SlashCommandBuilder, CommandInteraction, Role, GuildMember, ActionRowBu
 import { filterMembers } from '../services/filterService';
 import getPrisma from '../prisma';
 import PQueue from 'p-queue';
+import { requireGuildId } from '../lib/context';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -47,9 +48,10 @@ module.exports = {
     const prisma = getPrisma();
     const focusedOption = interaction.options.getFocused(true);
     if (focusedOption.name === 'segment') {
+        const gid = requireGuildId(interaction.guildId);
         const segments = await prisma.segment.findMany({
             where: {
-                guildId: interaction.guildId!,
+                guildId: gid,
                 name: {
                     startsWith: focusedOption.value,
                     mode: 'insensitive',
@@ -66,6 +68,7 @@ module.exports = {
     if (!interaction.guild) return;
 
     const prisma = getPrisma();
+    const gid = requireGuildId(interaction.guildId);
     const group = interaction.options.getSubcommandGroup();
 
     if (group === 'segment') {
@@ -81,12 +84,10 @@ module.exports = {
             };
 
             try {
-                await prisma.segment.create({
-                    data: {
-                        name,
-                        guildId: interaction.guild.id,
-                        conditions: conditions,
-                    },
+                await prisma.segment.upsert({
+                    where: { guildId_name: { guildId: gid, name } },
+                    create: { guildId: gid, name, conditions },
+                    update: { conditions },
                 });
                 await interaction.reply({ content: `✅ Segment **${name}** has been saved.`, ephemeral: true });
             } catch (error) {
@@ -95,7 +96,7 @@ module.exports = {
             }
         } else if (subcommand === 'list') {
             const segments = await prisma.segment.findMany({
-                where: { guildId: interaction.guild.id },
+                where: { guildId: gid },
                 orderBy: { name: 'asc' },
             });
 
@@ -129,7 +130,9 @@ module.exports = {
         let segmentMessage = '';
 
         if (segmentName) {
-            const segment = await prisma.segment.findUnique({ where: { name: segmentName } });
+            const segment = await prisma.segment.findUnique({
+                where: { guildId_name: { guildId: gid, name: segmentName } },
+            });
             if (!segment) {
                 await interaction.editReply({ content: `❌ Segment named **${segmentName}** not found.` });
                 return;

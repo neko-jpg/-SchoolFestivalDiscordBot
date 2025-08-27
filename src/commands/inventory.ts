@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import getPrisma from '../prisma';
+import { requireGuildId } from '../lib/context';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -37,6 +38,7 @@ module.exports = {
     if (!interaction.isChatInputCommand()) return;
 
     const prisma = getPrisma();
+    const gid = requireGuildId(interaction.guildId);
     const subcommand = interaction.options.getSubcommand();
     const name = interaction.options.getString('name');
     const quantity = interaction.options.getInteger('quantity');
@@ -46,14 +48,15 @@ module.exports = {
         const description = interaction.options.getString('description');
         await prisma.inventoryItem.create({
           data: {
+            guildId: gid,
             name: name!,
             quantity: quantity!,
-            description: description,
+            description,
           },
         });
         await interaction.reply(`Added **${quantity}** of **${name}** to the inventory.`);
       } else if (subcommand === 'list') {
-        const items = await prisma.inventoryItem.findMany();
+        const items = await prisma.inventoryItem.findMany({ where: { guildId: gid } });
         if (items.length === 0) {
           await interaction.reply('The inventory is empty.');
           return;
@@ -64,7 +67,9 @@ module.exports = {
         });
         await interaction.reply({ embeds: [embed] });
       } else if (subcommand === 'checkout') {
-        const item = await prisma.inventoryItem.findUnique({ where: { name: name! } });
+        const item = await prisma.inventoryItem.findUnique({
+          where: { guildId_name: { guildId: gid, name: name! } },
+        });
         if (!item) {
           await interaction.reply({ content: `Item "${name}" not found.`, ephemeral: true });
           return;
@@ -77,21 +82,23 @@ module.exports = {
         checkouts.push({ user: interaction.user.tag, quantity: quantity!, date: new Date().toISOString() });
 
         await prisma.inventoryItem.update({
-          where: { name: name! },
+          where: { guildId_name: { guildId: gid, name: name! } },
           data: {
             quantity: { decrement: quantity! },
-            checkouts: checkouts,
+            checkouts,
           },
         });
         await interaction.reply(`**${interaction.user.tag}** checked out **${quantity}** of **${name}**.`);
       } else if (subcommand === 'checkin') {
-        const item = await prisma.inventoryItem.findUnique({ where: { name: name! } });
+        const item = await prisma.inventoryItem.findUnique({
+          where: { guildId_name: { guildId: gid, name: name! } },
+        });
         if (!item) {
           await interaction.reply({ content: `Item "${name}" not found.`, ephemeral: true });
           return;
         }
         await prisma.inventoryItem.update({
-          where: { name: name! },
+          where: { guildId_name: { guildId: gid, name: name! } },
           data: {
             quantity: { increment: quantity! },
           },

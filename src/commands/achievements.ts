@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import getPrisma from '../prisma';
+import { requireGuildId } from '../lib/context';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -23,11 +24,14 @@ module.exports = {
         await interaction.deferReply();
 
         const prisma = getPrisma();
+        const gid = requireGuildId(interaction.guildId);
         const [kudosGiven, kudosReceived, itemsReported, shiftCount] = await Promise.all([
-          prisma.kudos.count({ where: { fromUserId: targetUser.id } }),
-          prisma.kudos.count({ where: { toUserId: targetUser.id } }),
-          prisma.lostItem.count({ where: { reportedById: targetUser.id } }),
-          prisma.shift.count({ where: { assignees: { some: { id: targetUser.id } } } })
+          prisma.kudos.count({ where: { guildId: gid, fromUserId: targetUser.id } }),
+          prisma.kudos.count({ where: { guildId: gid, toUserId: targetUser.id } }),
+          prisma.lostItem.count({ where: { guildId: gid, reportedById: targetUser.id } }),
+          prisma.shiftMember.count({
+            where: { userId: targetUser.id, shift: { guildId: gid } },
+          }),
         ]);
 
         const embed = new EmbedBuilder()

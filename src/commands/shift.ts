@@ -1,5 +1,7 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import getPrisma from '../prisma';
+import { requireGuildId } from '../lib/context';
+import { parseTimeRange } from '../lib/time';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -30,34 +32,43 @@ module.exports = {
 
     const prisma = getPrisma();
     const subcommand = interaction.options.getSubcommand();
+    const gid = requireGuildId(interaction.guildId);
 
     try {
       if (subcommand === 'create') {
+        const name = interaction.options.getString('name', true);
+        const time = interaction.options.getString('time', true);
+        const location = interaction.options.getString('location');
+        const { start, end } = parseTimeRange(time, 'Asia/Tokyo');
+
         const newShift = await prisma.shift.create({
           data: {
-            name: interaction.options.getString('name', true),
-            time: interaction.options.getString('time', true),
-            location: interaction.options.getString('location', true),
-            // assignees is now a relation, so it's not set directly
+            guildId: gid,
+            name,
+            location,
+            startAt: start,
+            endAt: end,
+            timezone: 'Asia/Tokyo',
           },
         });
         await interaction.reply(`Shift "${newShift.name}" created with ID: **${newShift.id}**`);
 
       } else if (subcommand === 'list') {
         const shifts = await prisma.shift.findMany({
-          include: {
-            assignees: true, // Include the related User objects
-          },
+          where: { guildId: gid },
+          include: { members: { include: { user: true } } },
+          orderBy: { startAt: 'asc' },
         });
         if (shifts.length === 0) {
           await interaction.reply('No shifts have been created yet.');
           return;
         }
         const embed = new EmbedBuilder().setColor('#FFC300').setTitle('Shift Roster');
+        const pad = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
         shifts.forEach((shift) => {
-          const assignees = shift.assignees.map((user: { tag: string | null; id: string }) => user.tag || user.id).join(', ') || 'None';
+          const assignees = (shift.members ?? []).map(m => m.user?.tag ?? m.userId).join(', ') || 'None';
           embed.addFields({
-            name: `${shift.name} @ ${shift.location} (${shift.time})`,
+            name: `${shift.name} @ ${shift.location ?? 'TBD'} (${pad(shift.startAt)}-${pad(shift.endAt)})`,
             value: `**ID:** ${shift.id}\n**Assigned:** ${assignees}`,
           });
         });
@@ -70,7 +81,7 @@ module.exports = {
         // Find the shift first to check for existence and current assignees
         const shift = await prisma.shift.findUnique({
             where: { id: shiftId },
-            include: { assignees: true },
+            include: { members: true },
         });
 
         if (!shift) {
@@ -79,7 +90,7 @@ module.exports = {
         }
 
         // Check if user is already assigned
-        if (shift.assignees.some(user => user.id === userToAssign.id)) {
+        if ((shift.members ?? []).some(m => m.userId === userToAssign.id)) {
             await interaction.reply({ content: `${userToAssign.tag} is already assigned to this shift.`, ephemeral: true });
             return;
         }
@@ -92,13 +103,8 @@ module.exports = {
         });
 
         // Connect the user to the shift
-        await prisma.shift.update({
-          where: { id: shiftId },
-          data: {
-            assignees: {
-              connect: { id: userToAssign.id },
-            },
-          },
+        await prisma.shiftMember.create({
+          data: { shiftId: shiftId, userId: userToAssign.id, role: null, notes: null },
         });
 
         await interaction.reply(`${userToAssign.tag} has been assigned to the "${shift.name}" shift.`);
