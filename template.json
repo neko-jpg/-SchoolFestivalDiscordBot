@@ -1,0 +1,87 @@
+{
+  "version": "1",
+  "name": "標準テンプレート",
+  "roles": [
+    {
+      "name": "実行委員",
+      "color": "#3498DB",
+      "hoist": true,
+      "mentionable": true
+    },
+    {
+      "name": "1年生",
+      "color": "#2ECC71"
+    },
+    {
+      "name": "2年生",
+      "color": "#F1C40F"
+    },
+    {
+      "name": "3年生",
+      "color": "#E74C3C"
+    }
+  ],
+  "categories": [
+    {
+      "name": "運営本部",
+      "channels": [
+        {
+          "name": "全体連絡",
+          "type": "text",
+          "topic": "実行委員向けの全体連絡チャンネルです。"
+        },
+        {
+          "name": "アナウンス",
+          "type": "text",
+          "topic": "Botによる自動通知や重要告知が投稿されます。",
+          "overwrites": [
+            {
+              "role": "@everyone",
+              "deny": ["SEND_MESSAGES"],
+              "allow": ["VIEW_CHANNEL", "READ_MESSAGE_HISTORY"]
+            },
+            {
+              "role": "実行委員",
+              "allow": ["SEND_MESSAGES"]
+            }
+          ]
+        },
+        {
+          "name": "議事録",
+          "type": "text",
+          "topic": "AIによる議事録の要約が自動投稿されます。"
+        },
+        {
+          "name": "会議室",
+          "type": "voice",
+          "bitrate": 64000
+        }
+      ]
+    },
+    {
+      "name": "各係連絡",
+      "channels": [
+        {
+          "name": "企画係",
+          "type": "text",
+          "topic": "企画係の連絡・相談用チャンネルです。"
+        },
+        {
+          "name": "広報係",
+          "type": "text",
+          "topic": "広報係の連絡・相談用チャンネルです。"
+        },
+        {
+          "name": "会計係",
+          "type": "text",
+          "topic": "会計係の連絡・相談用チャンネルです。"
+        },
+        {
+          "name": "資材・警備係",
+          "type": "text",
+          "topic": "資材係と警備係の連絡・相談用チャンネルです。"
+        }
+      ]
+    }
+  ]
+}
