@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import getPrisma from '../prisma';
+import { requireGuildId } from '../lib/context';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -29,6 +30,7 @@ module.exports = {
     if (!interaction.isChatInputCommand()) return;
 
     const prisma = getPrisma();
+    const gid = requireGuildId(interaction.guildId);
     const subcommand = interaction.options.getSubcommand();
 
     try {
@@ -39,6 +41,7 @@ module.exports = {
 
         const newItem = await prisma.lostItem.create({
           data: {
+            guildId: gid,
             itemName,
             foundLocation,
             imageUrl: image?.url,
@@ -52,7 +55,7 @@ module.exports = {
         await interaction.deferReply();
         const items = await prisma.lostItem.findMany({
           // After prisma generate, this can be LostItemStatus.IN_STORAGE
-          where: { status: 'IN_STORAGE' },
+          where: { guildId: gid, status: 'IN_STORAGE' },
           orderBy: { createdAt: 'desc' },
         });
 

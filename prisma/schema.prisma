@@ -11,29 +11,50 @@ datasource db {
 }
 
 model User {
-  id     String  @id // Discord User ID
-  tag    String?
-  shifts Shift[] @relation("ShiftToUser")
+  id           String       @id // Discord User ID
+  tag          String?
+  shiftMembers ShiftMember[]
 }
 
 model Shift {
-  id        String   @id @default(cuid())
-  name      String
-  time      String
-  location  String
-  assignees User[]   @relation("ShiftToUser")
+  id       String       @id @default(cuid())
+  guildId  String
+  name     String
+  location String?
+  startAt  DateTime
+  endAt    DateTime
+  timezone String
+  members  ShiftMember[]
+
+  @@index([guildId])
+}
+
+model ShiftMember {
+  id      String @id @default(cuid())
+  shiftId String
+  userId  String
+  role    String?
+  notes   String?
+  shift   Shift @relation(fields: [shiftId], references: [id])
+  user    User  @relation(fields: [userId], references: [id])
+
+  @@unique([shiftId, userId])
 }
 
 model InventoryItem {
-  id          String  @id @default(cuid())
-  name        String  @unique
+  id          String @id @default(cuid())
+  guildId     String
+  name        String
   description String?
   quantity    Int
-  checkouts   Json    @default("[]")
+  checkouts   Json   @default("[]")
+
+  @@unique([guildId, name])
 }
 
 model Kudos {
   id         String   @id @default(cuid())
+  guildId    String
   fromUserId String
   toUserId   String
   message    String
@@ -46,30 +67,35 @@ enum LostItemStatus {
 }
 
 model LostItem {
-  id            String   @id @default(cuid())
+  id            String        @id @default(cuid())
+  guildId       String
   itemName      String
   foundLocation String
   imageUrl      String?
   reportedById  String
   status        LostItemStatus @default(IN_STORAGE)
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
 }
 
 model Knowledge {
   id        String   @id @default(cuid())
-  keyword   String   @unique
+  guildId   String
+  keyword   String
   content   String
   createdAt DateTime @default(now())
+
+  @@unique([guildId, keyword])
 }
 
 model CongestionReport {
-  id        String   @id @default(cuid())
-  location  String
-  level     Int      // e.g., 1 for low, 2 for medium, 3 for high
+  id         String   @id @default(cuid())
+  guildId    String
+  location   String
+  level      Int      // e.g., 1 for low, 2 for medium, 3 for high
   reporterId String
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
-  @@index([location, createdAt])
+  @@index([guildId, location, createdAt])
 }
 
 model Template {
@@ -82,6 +108,7 @@ model Template {
 
 model BuildRun {
   id           String   @id @default(cuid())
+  guildId      String
   templateName String
   dryRunResult Json
   snapshot     Json
@@ -92,13 +119,14 @@ model BuildRun {
 
 model Segment {
   id          String   @id @default(cuid())
-  name        String   @unique
+  guildId     String
+  name        String
   description String?
   conditions  Json
-  guildId     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@unique([guildId, name])
   @@index([guildId])
 }
 

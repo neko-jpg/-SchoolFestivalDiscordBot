@@ -4,6 +4,7 @@ import logger from '../logger';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
+import { requireGuildId } from '../lib/context';
 
 // --- Configuration ---
 // Using path.resolve to ensure the path is correct regardless of execution context.
@@ -59,6 +60,7 @@ module.exports = {
     if (!interaction.isChatInputCommand()) return;
     const subcommand = interaction.options.getSubcommand();
     const prisma = getPrisma();
+    const gid = requireGuildId(interaction.guildId);
 
     try {
       if (subcommand === 'report') {
@@ -67,6 +69,7 @@ module.exports = {
 
         await prisma.congestionReport.create({
           data: {
+            guildId: gid,
             location,
             level,
             reporterId: interaction.user.id,
@@ -91,6 +94,7 @@ module.exports = {
         await interaction.deferReply();
 
         const latestReports = await prisma.congestionReport.findMany({
+          where: { guildId: gid },
           distinct: ['location'],
           orderBy: { createdAt: 'desc' },
         });

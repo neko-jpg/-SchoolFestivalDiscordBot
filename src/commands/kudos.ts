@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import getPrisma from '../prisma';
+import { requireGuildId } from '../lib/context';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -21,6 +22,7 @@ module.exports = {
     if (!interaction.isChatInputCommand()) return;
 
     const prisma = getPrisma();
+    const gid = requireGuildId(interaction.guildId);
     const subcommand = interaction.options.getSubcommand();
 
     try {
@@ -35,9 +37,10 @@ module.exports = {
 
         await prisma.kudos.create({
           data: {
+            guildId: gid,
             fromUserId: interaction.user.id,
             toUserId: targetUser.id,
-            message: message,
+            message,
           },
         });
 
@@ -53,6 +56,7 @@ module.exports = {
       } else if (subcommand === 'top') {
         const topReceivers = await prisma.kudos.groupBy({
           by: ['toUserId'],
+          where: { guildId: gid },
           _count: {
             toUserId: true,
           },

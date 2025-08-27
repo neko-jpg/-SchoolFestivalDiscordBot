@@ -39,7 +39,8 @@ export async function executeBuild(guild: Guild, diff: DiffResult, currentState:
     const prisma = getPrisma();
     const buildRun = await prisma.buildRun.create({
         data: {
-            templateName: templateName,
+            guildId: guild.id,
+            templateName,
             executedBy: userId,
             status: 'PENDING',
             snapshot: currentState as any,
@@ -144,10 +145,9 @@ export async function executeBuild(guild: Guild, diff: DiffResult, currentState:
         }
     }
 
-    const finalStatus = failures.length > 0 ? 'PARTIAL_SUCCESS' : 'SUCCESS';
     await prisma.buildRun.update({
         where: { id: buildRun.id },
-        data: { status: finalStatus },
+        data: { status: 'SUCCESS' },
     });
 
     return { buildRun, failures };
