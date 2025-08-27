@@ -1,12 +1,10 @@
-import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import { google } from 'googleapis';
+import prisma from '../prisma';
 
-const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
-const EXPENSE_FORM_URL = process.env.EXPENSE_REPORT_FORM_URL;
-
-async function getFinanceSummary() {
-  if (!GOOGLE_SHEET_ID || !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    return { error: 'Google Sheets not configured.' };
+async function getFinanceSummary(googleSheetId: string) {
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    return { error: 'Google Sheets API credentials are not configured.' };
   }
   try {
     const auth = new google.auth.GoogleAuth({
@@ -16,7 +14,7 @@ async function getFinanceSummary() {
     const sheets = google.sheets({ version: 'v4', auth });
 
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: GOOGLE_SHEET_ID,
+      spreadsheetId: googleSheetId,
       range: 'Form Responses 1!B:D', // Assumes columns are Timestamp, Expense Item, Category, Amount
     });
 
@@ -51,34 +49,42 @@ async function getFinanceSummary() {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('finance')
-    .setDescription('Handles accounting and finance tasks.')
+    .setDescription('会計関連のタスクを処理します。')
     .addSubcommand(subcommand =>
       subcommand
         .setName('register')
-        .setDescription('Provides the link to the expense report form.')
+        .setDescription('経費報告フォームへのリンクを提供します。')
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('summary')
-        .setDescription('Shows a summary of all expenses.')
+        .setDescription('すべての経費の要約を表示します。')
     ),
   async execute(interaction: CommandInteraction) {
-    if (!interaction.isChatInputCommand()) return;
+    if (!interaction.isChatInputCommand() || !interaction.inGuild()) return;
+
+    const config = await prisma.guildConfig.findUnique({
+      where: { guildId: interaction.guildId },
+    });
 
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'register') {
-      if (!EXPENSE_FORM_URL) {
-        await interaction.reply({ content: 'The expense report form URL is not configured.', ephemeral: true });
+      if (!config || !config.expenseFormUrl) {
+        await interaction.reply({ content: '経費報告フォームのURLが設定されていません。`/config expenseform`で設定してください。', ephemeral: true });
         return;
       }
-      await interaction.reply(`To report an expense, please use the Google Form: ${EXPENSE_FORM_URL}`);
+      await interaction.reply(`経費を報告するには、こちらのGoogleフォームを使用してください: ${config.expenseFormUrl}`);
     } else if (subcommand === 'summary') {
+      if (!config || !config.googleSheetId) {
+        await interaction.reply({ content: 'GoogleスプレッドシートIDが設定されていません。`/config sheet`で設定してください。', ephemeral: true });
+        return;
+      }
       await interaction.deferReply();
-      const { total, summary, error } = await getFinanceSummary();
+      const { total, summary, error } = await getFinanceSummary(config.googleSheetId);
 
       if (error) {
-        await interaction.editReply({ content: error, ephemeral: true });
+        await interaction.editReply({ content: error });
         return;
       }
 
