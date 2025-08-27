@@ -1,105 +1,95 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { Client as NotionClient } from '@notionhq/client';
 
-const submissionsFilePath = path.join(__dirname, '..', '..', 'data', 'submissions.json');
+// Initialize Notion Client
+const notion = new NotionClient({ auth: process.env.NOTION_API_KEY });
+const databaseId = process.env.NOTION_DATABASE_ID;
 
-interface Submission {
-  id: string;
-  name: string;
-  ownerId: string;
-  ownerTag: string;
-  dueDate: string;
-  status: 'Pending' | 'Submitted';
+if (!process.env.NOTION_API_KEY || !databaseId) {
+  console.warn('Notion API Key or Database ID not set. The /submit command will be disabled.');
 }
-
-// Helper functions to read/write from JSON file
-const readSubmissions = (): Submission[] => {
-  try {
-    const data = fs.readFileSync(submissionsFilePath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading submissions file:', error);
-    return [];
-  }
-};
-
-const writeSubmissions = (data: Submission[]) => {
-  try {
-    fs.writeFileSync(submissionsFilePath, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('Error writing submissions file:', error);
-  }
-};
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('submit')
-    .setDescription('Manages submissions.')
+    .setDescription('Manages submissions with Notion.')
     .addSubcommand(subcommand =>
       subcommand
         .setName('add')
-        .setDescription('Adds a new submission to the tracker.')
+        .setDescription('Adds a new submission to the Notion database.')
         .addStringOption(option =>
           option.setName('name').setDescription('The name of the submission').setRequired(true))
         .addUserOption(option =>
           option.setName('owner').setDescription('The user responsible for the submission').setRequired(true))
         .addStringOption(option =>
-          option.setName('duedate').setDescription('The due date (e.g., YYYY-MM-DD)').setRequired(true))
+          option.setName('duedate').setDescription('The due date (YYYY-MM-DD)').setRequired(true))
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('list')
-        .setDescription('Lists all current submissions.')
+        .setDescription('Lists all submissions from the Notion database.')
     ),
   async execute(interaction: CommandInteraction) {
-    if (!interaction.isChatInputCommand()) return;
-
-    if (interaction.options.getSubcommand() === 'add') {
-      const name = interaction.options.getString('name', true);
-      const owner = interaction.options.getUser('owner', true);
-      const dueDate = interaction.options.getString('duedate', true);
-
-      const newSubmission: Submission = {
-        id: uuidv4(),
-        name,
-        ownerId: owner.id,
-        ownerTag: owner.tag,
-        dueDate,
-        status: 'Pending',
-      };
-
-      const submissions = readSubmissions();
-      submissions.push(newSubmission);
-      writeSubmissions(submissions);
-
-      await interaction.reply({
-        content: `Added new submission: **${name}** assigned to **${owner.tag}** with due date **${dueDate}**.`,
-        ephemeral: false,
-      });
-    } else if (interaction.options.getSubcommand() === 'list') {
-      const submissions = readSubmissions();
-
-      if (submissions.length === 0) {
-        await interaction.reply('There are no submissions to display.');
+    if (!interaction.isChatInputCommand() || !databaseId) {
+        await interaction.reply({ content: 'The Notion integration is not configured. Please contact an administrator.', ephemeral: true });
         return;
-      }
+    }
 
-      const embed = new EmbedBuilder()
-        .setColor('#0099ff')
-        .setTitle('Submission Tracker')
-        .setDescription('Here is a list of all current submissions:');
+    try {
+      if (interaction.options.getSubcommand() === 'add') {
+        const name = interaction.options.getString('name', true);
+        const owner = interaction.options.getUser('owner', true);
+        const dueDate = interaction.options.getString('duedate', true);
 
-      submissions.forEach(sub => {
-        embed.addFields({
-          name: `${sub.name} (Status: ${sub.status})`,
-          value: `Owner: ${sub.ownerTag}\nDue Date: ${sub.dueDate}`,
-          inline: false,
+        await notion.pages.create({
+          parent: { database_id: databaseId },
+          properties: {
+            // Assumes the Notion DB has columns with these exact names.
+            'Name': { title: [{ text: { content: name } }] },
+            'Owner': { rich_text: [{ text: { content: owner.tag } }] },
+            'Due Date': { date: { start: dueDate } },
+            'Status': { select: { name: 'Pending' } },
+          },
         });
-      });
 
-      await interaction.reply({ embeds: [embed] });
+        await interaction.reply({
+          content: `Added new submission to Notion: **${name}** assigned to **${owner.tag}**.`,
+        });
+      } else if (interaction.options.getSubcommand() === 'list') {
+        const response = await notion.databases.query({
+          database_id: databaseId,
+        });
+
+        const submissions = response.results;
+        if (submissions.length === 0) {
+          await interaction.reply('There are no submissions in the Notion database.');
+          return;
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor('#0099ff')
+          .setTitle('Submission Tracker (from Notion)')
+          .setDescription('Here is a list of all current submissions:');
+
+        submissions.forEach((page: any) => {
+          const props = page.properties;
+          const name = props.Name?.title[0]?.text?.content || 'No Name';
+          const owner = props.Owner?.rich_text[0]?.text?.content || 'N/A';
+          const dueDate = props['Due Date']?.date?.start || 'N/A';
+          const status = props.Status?.select?.name || 'N/A';
+
+          embed.addFields({
+            name: `${name} (Status: ${status})`,
+            value: `Owner: ${owner}\nDue Date: ${dueDate}`,
+            inline: false,
+          });
+        });
+
+        await interaction.reply({ embeds: [embed] });
+      }
+    } catch (error) {
+        console.error('Notion API error:', error);
+        await interaction.reply({ content: 'There was an error communicating with Notion.', ephemeral: true });
     }
   },
 };

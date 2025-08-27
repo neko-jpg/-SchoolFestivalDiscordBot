@@ -1,36 +1,12 @@
-import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, Prisma } from 'discord.js';
+import { PrismaClient } from '@prisma/client';
 
-const shiftsFilePath = path.join(__dirname, '..', '..', 'data', 'shifts.json');
-
-interface Shift {
-  id: string;
-  name: string;
-  time: string;
-  location: string;
-  assignees: { id: string; tag: string }[];
-}
-
-// Helper functions
-const readShifts = (): Shift[] => {
-  try {
-    const data = fs.readFileSync(shiftsFilePath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
-  }
-};
-
-const writeShifts = (data: Shift[]) => {
-  fs.writeFileSync(shiftsFilePath, JSON.stringify(data, null, 2));
-};
+const prisma = new PrismaClient();
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('shift')
-    .setDescription('Manages shifts.')
+    .setDescription('Manages shifts using a database.')
     .addSubcommand(subcommand =>
       subcommand
         .setName('create')
@@ -55,52 +31,64 @@ module.exports = {
     if (!interaction.isChatInputCommand()) return;
 
     const subcommand = interaction.options.getSubcommand();
-    const shifts = readShifts();
 
-    if (subcommand === 'create') {
-      const newShift: Shift = {
-        id: uuidv4().substring(0, 8), // Short UUID for easier use
-        name: interaction.options.getString('name', true),
-        time: interaction.options.getString('time', true),
-        location: interaction.options.getString('location', true),
-        assignees: [],
-      };
-      shifts.push(newShift);
-      writeShifts(shifts);
-      await interaction.reply(`Shift "${newShift.name}" created with ID: **${newShift.id}**`);
-    } else if (subcommand === 'list') {
-      if (shifts.length === 0) {
-        await interaction.reply('No shifts have been created yet.');
-        return;
-      }
-      const embed = new EmbedBuilder().setColor('#FFC300').setTitle('Shift Roster');
-      shifts.forEach(shift => {
-        const assignees = shift.assignees.map(a => a.tag).join(', ') || 'None';
-        embed.addFields({
-          name: `${shift.name} @ ${shift.location} (${shift.time})`,
-          value: `**ID:** ${shift.id}\n**Assigned:** ${assignees}`,
+    try {
+      if (subcommand === 'create') {
+        const newShift = await prisma.shift.create({
+          data: {
+            name: interaction.options.getString('name', true),
+            time: interaction.options.getString('time', true),
+            location: interaction.options.getString('location', true),
+            assignees: [], // Prisma's JsonNull
+          },
         });
-      });
-      await interaction.reply({ embeds: [embed] });
-    } else if (subcommand === 'assign') {
-      const shiftId = interaction.options.getString('shiftid', true);
-      const user = interaction.options.getUser('user', true);
-      const shiftIndex = shifts.findIndex(s => s.id === shiftId);
+        await interaction.reply(`Shift "${newShift.name}" created with ID: **${newShift.id}**`);
 
-      if (shiftIndex === -1) {
-        await interaction.reply({ content: `Shift with ID "${shiftId}" not found.`, ephemeral: true });
-        return;
+      } else if (subcommand === 'list') {
+        const shifts = await prisma.shift.findMany();
+        if (shifts.length === 0) {
+          await interaction.reply('No shifts have been created yet.');
+          return;
+        }
+        const embed = new EmbedBuilder().setColor('#FFC300').setTitle('Shift Roster');
+        shifts.forEach(shift => {
+          const assignees = (shift.assignees as any[]).map(a => a.tag).join(', ') || 'None';
+          embed.addFields({
+            name: `${shift.name} @ ${shift.location} (${shift.time})`,
+            value: `**ID:** ${shift.id}\n**Assigned:** ${assignees}`,
+          });
+        });
+        await interaction.reply({ embeds: [embed] });
+
+      } else if (subcommand === 'assign') {
+        const shiftId = interaction.options.getString('shiftid', true);
+        const user = interaction.options.getUser('user', true);
+
+        const shift = await prisma.shift.findUnique({ where: { id: shiftId } });
+
+        if (!shift) {
+          await interaction.reply({ content: `Shift with ID "${shiftId}" not found.`, ephemeral: true });
+          return;
+        }
+
+        const assignees = (shift.assignees as any[]) || [];
+        if (assignees.some(a => a.id === user.id)) {
+          await interaction.reply({ content: `${user.tag} is already assigned to this shift.`, ephemeral: true });
+          return;
+        }
+
+        assignees.push({ id: user.id, tag: user.tag });
+
+        await prisma.shift.update({
+          where: { id: shiftId },
+          data: { assignees: assignees as any },
+        });
+
+        await interaction.reply(`${user.tag} has been assigned to the "${shift.name}" shift.`);
       }
-
-      const shift = shifts[shiftIndex];
-      if (shift.assignees.some(a => a.id === user.id)) {
-        await interaction.reply({ content: `${user.tag} is already assigned to this shift.`, ephemeral: true });
-        return;
-      }
-
-      shifts[shiftIndex].assignees.push({ id: user.id, tag: user.tag });
-      writeShifts(shifts);
-      await interaction.reply(`${user.tag} has been assigned to the "${shifts[shiftIndex].name}" shift.`);
+    } catch (error) {
+      console.error('Prisma error in shift command:', error);
+      await interaction.reply({ content: 'There was an error while interacting with the database.', ephemeral: true });
     }
   },
 };
