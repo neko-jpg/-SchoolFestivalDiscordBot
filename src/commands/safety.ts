@@ -39,7 +39,10 @@ module.exports = {
 
       if (message) {
         await interaction.reply({ content: `Sending the following alert:\n\n${message}` , ephemeral: true });
-        await interaction.channel?.send(message);
+        // Using a more direct check to satisfy the type checker.
+        if (interaction.channel && 'send' in interaction.channel) {
+          await interaction.channel.send(message);
+        }
       } else {
         await interaction.reply({ content: 'Invalid alert type selected.', ephemeral: true });
       }

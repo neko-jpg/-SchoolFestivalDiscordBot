@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, CommandInteraction, Role, GuildMember, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, CommandInteraction, Role, GuildMember, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder, AutocompleteInteraction, ChatInputCommandInteraction } from 'discord.js';
 import { filterMembers } from '../services/filterService';
 import prisma from '../prisma';
 import PQueue from 'p-queue';
@@ -43,9 +43,7 @@ module.exports = {
                     .setDescription('List all saved segments in this server.')
             )
     ),
-  async autocomplete(interaction: CommandInteraction) {
-    if (!interaction.isAutocomplete()) return;
-
+  async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);
     if (focusedOption.name === 'segment') {
         const segments = await prisma.segment.findMany({
@@ -63,8 +61,8 @@ module.exports = {
         );
     }
   },
-  async execute(interaction: CommandInteraction) {
-    if (!interaction.isChatInputCommand() || !interaction.guild) return;
+  async execute(interaction: ChatInputCommandInteraction) {
+    if (!interaction.guild) return;
 
     const group = interaction.options.getSubcommandGroup();
 

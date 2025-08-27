@@ -35,7 +35,7 @@ export async function executeRollback(buildRunId: string, guild: Guild) {
     if (buildRun.status === 'ROLLED_BACK') throw new Error('This build has already been rolled back.');
 
     const snapshot = buildRun.snapshot as any;
-    const diff = buildRun.dryRunResult as DiffResult;
+    const diff = buildRun.dryRunResult as unknown as DiffResult;
     const snapshotRoles = new Map<string, any>((snapshot.roles || []).map((r: any) => [r.id, r]));
     const snapshotChannels = new Map<string, any>((snapshot.channels || []).map((c: any) => [c.id, c]));
 

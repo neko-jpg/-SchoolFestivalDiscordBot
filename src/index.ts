@@ -2,7 +2,6 @@ import { Client, GatewayIntentBits, Collection, Interaction } from 'discord.js';
 import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { startReminderCronJob } from './scheduler';
 
 config();
 
@@ -38,7 +37,6 @@ for (const file of commandFiles) {
 client.once('ready', () => {
   if (client.user) {
     console.log(`Ready! Logged in as ${client.user.tag}`);
-    startReminderCronJob(client);
   } else {
     console.log('Ready! But user is not available.');
   }
