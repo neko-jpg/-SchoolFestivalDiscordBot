@@ -74,7 +74,7 @@ model BuildRun {
   templateName String
   dryRunResult Json
   snapshot     Json
-  status       String // PENDING, SUCCESS, FAILED
+  status       String // PENDING, SUCCESS, FAILED, ROLLED_BACK
   executedBy   String
   createdAt    DateTime @default(now())
 }

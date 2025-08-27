@@ -59,10 +59,11 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       await command.execute(interaction);
     } catch (error) {
       console.error(error);
+      const reply = { content: 'There was an error while executing this command!', ephemeral: true };
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+        await interaction.followUp(reply);
       } else {
-        await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+        await interaction.reply(reply);
       }
     }
   } else if (interaction.isButton()) {
@@ -75,17 +76,12 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       const buildRunId = interaction.customId.split('-')[2];
 
       try {
-        // Acknowledge the interaction immediately
         await interaction.update({ content: '🔄 Rolling back changes...', components: [] });
-
         await executeRollback(buildRunId, interaction.guild);
-
-        // Edit the original message to show final status
-        await interaction.followUp({ content: '✅ Rollback successful.', ephemeral: true });
-
+        await interaction.editReply({ content: '✅ Rollback successful.' });
       } catch (error: any) {
         console.error("Error during rollback:", error);
-        await interaction.followUp({ content: `❌ An error occurred during rollback: ${error.message}`, ephemeral: true });
+        await interaction.editReply({ content: `❌ An error occurred during rollback: ${error.message}` });
       }
     }
   }

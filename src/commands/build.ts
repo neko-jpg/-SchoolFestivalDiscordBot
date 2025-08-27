@@ -18,7 +18,6 @@ function formatOverwriteChanges(changes: OverwriteChanges[]): string {
     }).join('\n');
 }
 
-
 function formatDiffPreview(diff: DiffResult, templateName: string): EmbedBuilder {
     const embed = new EmbedBuilder()
         .setColor('#3498DB')
@@ -28,29 +27,23 @@ function formatDiffPreview(diff: DiffResult, templateName: string): EmbedBuilder
 
     let description = '';
 
-    // Roles
     diff.roles.toCreate.forEach(r => description += `➕ Create Role: \`${r.name}\`\n`);
     diff.roles.toUpdate.forEach(r => description += `🔄 Update Role: \`${r.existing.name}\`\n`);
-
-    // Categories
     diff.categories.toCreate.forEach(c => description += `➕ Create Category: \`${c.name}\`\n`);
-
-    // Channels
     diff.channels.toCreate.forEach(c => description += `➕ Create Channel: \`#${c.channel.name}\` in **${c.categoryName}**\n`);
     diff.channels.toUpdate.forEach(c => {
         description += `🔄 Update Channel: \`#${c.existing.name}\`\n`;
         if (c.changes.topic) {
             description += `  - Topic will be updated.\n`;
         }
-        if (c.changes.overwrites) {
-            description += formatOverwriteChanges(c.changes.overwrites);
+        if (c.changes.overwrites && c.changes.overwrites.length > 0) {
+            description += formatOverwriteChanges(c.changes.overwrites) + '\n';
         }
     });
 
     if (description === '') {
         embed.setDescription('✅ No changes detected. The server configuration already matches the template.');
     } else {
-        // Discord embed descriptions have a 4096 character limit. Truncate if necessary.
         if (description.length > 4000) {
             description = description.substring(0, 4000) + '\n...and more.';
         }
@@ -72,9 +65,7 @@ module.exports = {
           option.setName('name')
             .setDescription('The name of the template to apply.')
             .setRequired(true)
-            .addChoices(
-                { name: 'standard', value: 'standard' }
-            )
+            .addChoices({ name: 'standard', value: 'standard' })
         )
     ),
   async execute(interaction: CommandInteraction) {
@@ -82,20 +73,19 @@ module.exports = {
 
     if (interaction.options.getSubcommand() === 'apply') {
         const templateName = interaction.options.getString('name', true);
-        await interaction.reply({ content: `Request received for template **${templateName}**. Generating preview...`, ephemeral: true });
+        await interaction.reply({ content: `Request for template **${templateName}**. Analyzing...`, ephemeral: true });
 
         let diff: DiffResult;
         let currentState: GuildState;
 
         try {
-            // 1. Load template and calculate diff
             const templatePath = path.resolve(process.cwd(), 'template.json');
             const templateFile = await fs.readFile(templatePath, 'utf-8');
             const template: ServerTemplate = JSON.parse(templateFile);
+
             currentState = await getGuildState(interaction.guild);
             diff = diffTemplate(currentState, template);
 
-            // 2. Validate that the build is possible
             const validationErrors = validateBuild(interaction.guild, diff);
             if (validationErrors.length > 0) {
                 const errorEmbed = new EmbedBuilder()
@@ -106,7 +96,6 @@ module.exports = {
                 return;
             }
 
-            // 3. Format and send the preview
             const previewEmbed = formatDiffPreview(diff, templateName);
             const actionRow = new ActionRowBuilder<ButtonBuilder>()
                 .addComponents(
@@ -115,12 +104,11 @@ module.exports = {
                 );
 
             const response = await interaction.editReply({
-                content: ``,
+                content: '',
                 embeds: [previewEmbed],
                 components: [actionRow]
             });
 
-            // 3. Wait for button interaction
             const collector = response.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000 });
 
             collector.on('collect', async i => {
@@ -159,7 +147,7 @@ module.exports = {
             });
 
         } catch (error) {
-            console.error("Error during preview generation:", error);
+            console.error("Error during build preview:", error);
             await interaction.editReply({ content: 'An error occurred while generating the preview.', embeds:[], components: [] });
         }
     }
