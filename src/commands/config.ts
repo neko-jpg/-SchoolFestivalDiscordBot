@@ -54,7 +54,8 @@ module.exports = {
                 await interaction.reply({ content: `❌ 無効な日付形式です。YYYY-MM-DD形式で入力してください。`, ephemeral: true });
                 return;
             }
-            const startDate = new Date(dateStr);
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const startDate = new Date(year, month - 1, day); // 月は0-indexed
             await prisma.guildConfig.upsert({
               where: { guildId },
               update: { festivalStartDate: startDate },
@@ -64,9 +65,15 @@ module.exports = {
             break;
         }
       }
-    } catch (error) {
+    } catch (error: any) {
         console.error('Config command error:', error);
-        await interaction.reply({ content: '設定の保存中にエラーが発生しました。', ephemeral: true });
+        const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
+        const replyPayload = { content: `設定の保存中にエラーが発生しました:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(replyPayload);
+        } else {
+          await interaction.reply(replyPayload);
+        }
     }
   },
 };

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
+import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, PermissionFlagsBits } from 'discord.js';
 import { getGuildState, GuildState } from '../services/discordService';
 import { diffTemplate, DiffResult, ChannelChanges } from '../services/diffService';
 import { executeBuild } from '../services/executionService';
@@ -122,21 +122,49 @@ module.exports = {
 
                 collector.stop();
                 if (i.customId === 'build-confirm') {
+                    if (!i.guild) return;
+                    const me = await i.guild.members.fetchMe();
+                    const requiredPermissions = [PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles];
+                    const missingPermissions = requiredPermissions.filter(p => !me.permissions.has(p));
+
+                    if (missingPermissions.length > 0) {
+                        const missingPermsString = missingPermissions.map(p => {
+                            for (const key in PermissionFlagsBits) {
+                                if (PermissionFlagsBits[key as keyof typeof PermissionFlagsBits] === p) return key;
+                            }
+                            return String(p);
+                        }).join(', ');
+                        await i.update({ content: `❌ **Error:** I am missing required permissions: \`${missingPermsString}\`.\nPlease grant them and try again.`, embeds: [], components: [] });
+                        return;
+                    }
+
                     try {
                         await i.update({ content: 'Applying changes...', embeds: [], components: [] });
-                        const buildRun = await executeBuild(interaction.guild!, diff, currentState, templateName, i.user.id);
+
+                        const { buildRun, failures } = await executeBuild(i.guild, diff, currentState, templateName, i.user.id);
 
                         const undoButton = new ButtonBuilder()
                             .setCustomId(`build-undo-${buildRun.id}`)
                             .setLabel('Undo')
                             .setStyle(ButtonStyle.Danger);
 
-                        const successRow = new ActionRowBuilder<ButtonBuilder>().addComponents(undoButton);
+                        const resultRow = new ActionRowBuilder<ButtonBuilder>().addComponents(undoButton);
 
-                        await i.editReply({ content: '✅ Build successful! The template has been applied.', components: [successRow] });
-                    } catch (error) {
-                        console.error("Error during build execution:", error);
-                        await i.editReply({ content: '❌ An error occurred during execution. Please check the logs.' });
+                        let finalMessage = `✅ **Build Successful!**\nThe template has been applied.`;
+                        if (failures.length > 0) {
+                            let failureMessage = failures.slice(0, 15).join('\n- ');
+                            if (failures.length > 15) {
+                                failureMessage += `\n- ...and ${failures.length - 15} more.`;
+                            }
+                            finalMessage = `⚠️ **Build Finished with ${failures.length} errors.**\n\n**Errors:**\n- ${failureMessage}`;
+                        }
+
+                        await i.editReply({ content: finalMessage, components: [resultRow] });
+
+                    } catch (error: any) {
+                        console.error("Catastrophic error during build execution:", error);
+                        const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
+                        await i.editReply({ content: `❌ An unexpected catastrophic error occurred during execution:\n\`\`\`\n${msg}\n\`\`\``, components: [] });
                     }
                 } else if (i.customId === 'build-cancel') {
                     await i.update({ content: 'Operation cancelled.', embeds: [], components: [] });
@@ -151,10 +179,11 @@ module.exports = {
 
         } catch (error: any) {
             console.error("Error during build preview:", error);
+            const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
-                .setTitle('An Error Occurred')
-                .setDescription(error.message || 'An unknown error occurred while generating the preview.');
+                .setTitle('プレビュー生成中にエラーが発生しました')
+                .setDescription(`\`\`\`\n${msg}\n\`\`\``);
             await interaction.editReply({ content: '', embeds: [errorEmbed], components: [] });
         }
     }

@@ -4,7 +4,9 @@
   "description": "これは、文化祭ディスコードbot作成のためのレポジトリです",
   "main": "index.js",
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node --transpile-only src/index.ts",
     "deploy": "ts-node src/deploy-commands.ts",
     "typecheck": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
