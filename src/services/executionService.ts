@@ -123,10 +123,11 @@ export async function executeBuild(guild: Guild, diff: DiffResult, currentState:
         }
 
         // 4. If all successful, update the build run status
-        await prisma.buildRun.update({
+        const finalBuildRun = await prisma.buildRun.update({
             where: { id: buildRun.id },
             data: { status: 'SUCCESS' },
         });
+        return finalBuildRun;
 
     } catch (error) {
         // 5. If an error occurs, update the status and re-throw

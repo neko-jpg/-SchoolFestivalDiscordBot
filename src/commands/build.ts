@@ -1,10 +1,22 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 import { getGuildState, GuildState } from '../services/discordService';
-import { diffTemplate, DiffResult } from '../services/diffService';
+import { diffTemplate, DiffResult, OverwriteChanges } from '../services/diffService';
 import { executeBuild } from '../services/executionService';
 import { ServerTemplate } from '../types/template';
 import * as fs from 'fs/promises';
 import path from 'path';
+
+function formatOverwriteChanges(changes: OverwriteChanges[]): string {
+    return changes.map(c => {
+        const parts: string[] = [];
+        if (c.addedAllow.length > 0) parts.push(`+Allow(${c.addedAllow.join(', ')})`);
+        if (c.removedAllow.length > 0) parts.push(`-Allow(${c.removedAllow.join(', ')})`);
+        if (c.addedDeny.length > 0) parts.push(`+Deny(${c.addedDeny.join(', ')})`);
+        if (c.removedDeny.length > 0) parts.push(`-Deny(${c.removedDeny.join(', ')})`);
+        return `  - For @${c.roleName}: ${parts.join(' ')}`;
+    }).join('\n');
+}
+
 
 function formatDiffPreview(diff: DiffResult, templateName: string): EmbedBuilder {
     const embed = new EmbedBuilder()
@@ -13,27 +25,35 @@ function formatDiffPreview(diff: DiffResult, templateName: string): EmbedBuilder
         .setDescription('Review the following changes before applying the template. This is a preview and no changes have been made yet.')
         .setTimestamp();
 
-    const rolesToCreate = diff.roles.toCreate.map(r => `\`+ ${r.name}\``).join('\n') || 'None';
-    const rolesToUpdate = diff.roles.toUpdate.map(r => `\`~ ${r.existing.name}\``).join('\n') || 'None';
-    if (diff.roles.toCreate.length > 0 || diff.roles.toUpdate.length > 0) {
-        embed.addFields(
-            { name: 'Roles to Create', value: rolesToCreate, inline: true },
-            { name: 'Roles to Update', value: rolesToUpdate, inline: true }
-        );
-    }
+    let description = '';
 
-    const catsToCreate = diff.categories.toCreate.map(c => `\`+ ${c.name}\``).join('\n') || 'None';
-    if (diff.categories.toCreate.length > 0) {
-        embed.addFields({ name: 'Categories to Create', value: catsToCreate });
-    }
+    // Roles
+    diff.roles.toCreate.forEach(r => description += `➕ Create Role: \`${r.name}\`\n`);
+    diff.roles.toUpdate.forEach(r => description += `🔄 Update Role: \`${r.existing.name}\`\n`);
 
-    const chansToCreate = diff.channels.toCreate.map(c => `\`+ #${c.channel.name}\` (in ${c.categoryName})`).join('\n') || 'None';
-     if (diff.channels.toCreate.length > 0) {
-        embed.addFields({ name: 'Channels to Create', value: chansToCreate });
-    }
+    // Categories
+    diff.categories.toCreate.forEach(c => description += `➕ Create Category: \`${c.name}\`\n`);
 
-    if (embed.data.fields?.length === 0) {
+    // Channels
+    diff.channels.toCreate.forEach(c => description += `➕ Create Channel: \`#${c.channel.name}\` in **${c.categoryName}**\n`);
+    diff.channels.toUpdate.forEach(c => {
+        description += `🔄 Update Channel: \`#${c.existing.name}\`\n`;
+        if (c.changes.topic) {
+            description += `  - Topic will be updated.\n`;
+        }
+        if (c.changes.overwrites) {
+            description += formatOverwriteChanges(c.changes.overwrites);
+        }
+    });
+
+    if (description === '') {
         embed.setDescription('✅ No changes detected. The server configuration already matches the template.');
+    } else {
+        // Discord embed descriptions have a 4096 character limit. Truncate if necessary.
+        if (description.length > 4000) {
+            description = description.substring(0, 4000) + '\n...and more.';
+        }
+        embed.setDescription(description);
     }
 
     return embed;
@@ -101,8 +121,16 @@ module.exports = {
                 if (i.customId === 'build-confirm') {
                     try {
                         await i.update({ content: 'Applying changes...', embeds: [], components: [] });
-                        await executeBuild(interaction.guild!, diff, currentState, templateName, i.user.id);
-                        await i.editReply({ content: '✅ Build successful! The template has been applied.'});
+                        const buildRun = await executeBuild(interaction.guild!, diff, currentState, templateName, i.user.id);
+
+                        const undoButton = new ButtonBuilder()
+                            .setCustomId(`build-undo-${buildRun.id}`)
+                            .setLabel('Undo')
+                            .setStyle(ButtonStyle.Danger);
+
+                        const successRow = new ActionRowBuilder<ButtonBuilder>().addComponents(undoButton);
+
+                        await i.editReply({ content: '✅ Build successful! The template has been applied.', components: [successRow] });
                     } catch (error) {
                         console.error("Error during build execution:", error);
                         await i.editReply({ content: '❌ An error occurred during execution. Please check the logs.' });

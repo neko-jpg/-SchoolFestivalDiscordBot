@@ -27,9 +27,22 @@ export interface CategoryDiff {
     toSkip: SimpleChannel[];
 }
 
+export interface OverwriteChanges {
+    roleName: string;
+    addedAllow: string[];
+    removedAllow: string[];
+    addedDeny: string[];
+    removedDeny: string[];
+}
+
+export interface ChannelChanges {
+    topic?: string;
+    overwrites?: OverwriteChanges[];
+}
+
 export interface ChannelDiff {
     toCreate: { channel: TemplateChannel; categoryName: string }[];
-    toUpdate: { existing: SimpleChannel; changes: Partial<TemplateChannel>; categoryName: string }[];
+    toUpdate: { existing: SimpleChannel; changes: ChannelChanges; categoryName: string }[];
     toSkip: SimpleChannel[];
 }
 
@@ -88,33 +101,34 @@ function diffRoles(currentState: GuildState, template: ServerTemplate, result: D
     });
 }
 
-function areOverwritesEqual(templateOverwrites: TemplateRoleOverwrite[] = [], existingOverwrites: SimpleOverwrite[] = []): boolean {
-    if (templateOverwrites.length !== existingOverwrites.length) return false;
+function diffOverwrites(templateOverwrites: TemplateRoleOverwrite[] = [], existingOverwrites: SimpleOverwrite[] = []): OverwriteChanges[] {
+    const changes: OverwriteChanges[] = [];
+    const tplMap = new Map(templateOverwrites.map(o => [o.role, o]));
+    const existingMap = new Map(existingOverwrites.map(o => [o.roleName, o]));
 
-    const existingMap = new Map<string, { allow: Set<string>, deny: Set<string> }>();
-    existingOverwrites.forEach(o => {
-        existingMap.set(o.roleName, {
-            allow: new Set(o.allow),
-            deny: new Set(o.deny),
-        });
+    const allRoleNames = new Set([...tplMap.keys(), ...existingMap.keys()]);
+
+    allRoleNames.forEach(roleName => {
+        const tplO = tplMap.get(roleName);
+        const existingO = existingMap.get(roleName);
+
+        const tplAllow = new Set(tplO?.allow || []);
+        const tplDeny = new Set(tplO?.deny || []);
+        const existingAllow = new Set(existingO?.allow || []);
+        const existingDeny = new Set(existingO?.deny || []);
+
+        const addedAllow = [...tplAllow].filter(p => !existingAllow.has(p));
+        const removedAllow = [...existingAllow].filter(p => !tplAllow.has(p));
+        const addedDeny = [...tplDeny].filter(p => !existingDeny.has(p));
+        const removedDeny = [...existingDeny].filter(p => !tplDeny.has(p));
+
+        if (addedAllow.length > 0 || removedAllow.length > 0 || addedDeny.length > 0 || removedDeny.length > 0) {
+            changes.push({ roleName, addedAllow, removedAllow, addedDeny, removedDeny });
+        }
     });
 
-    for (const tplOverwrite of templateOverwrites) {
-        const existingO = existingMap.get(tplOverwrite.role);
-        if (!existingO) return false;
-
-        const tplAllow = new Set(tplOverwrite.allow || []);
-        const tplDeny = new Set(tplOverwrite.deny || []);
-
-        if (tplAllow.size !== existingO.allow.size || tplDeny.size !== existingO.deny.size) return false;
-
-        for (const p of tplAllow) if (!existingO.allow.has(p)) return false;
-        for (const p of tplDeny) if (!existingO.deny.has(p)) return false;
-    }
-
-    return true;
+    return changes;
 }
-
 
 function diffCategoriesAndChannels(currentState: GuildState, template: ServerTemplate, result: DiffResult) {
     const existingCategories = new Map<string, SimpleChannel>();
@@ -149,19 +163,23 @@ function diffCategoriesAndChannels(currentState: GuildState, template: ServerTem
                 if (!existingChannel) {
                     result.channels.toCreate.push({ channel: templateChannel, categoryName: templateCategory.name });
                 } else {
-                    const changes: Partial<TemplateChannel> = {};
+                    const changes: ChannelChanges = {};
+                    let hasChanges = false;
 
                     // Compare topic
                     if (templateChannel.topic !== undefined && templateChannel.topic !== existingChannel.topic) {
                         changes.topic = templateChannel.topic;
+                        hasChanges = true;
                     }
 
                     // Compare overwrites
-                    if (!areOverwritesEqual(templateChannel.overwrites, existingChannel.overwrites)) {
-                        changes.overwrites = templateChannel.overwrites;
+                    const overwriteChanges = diffOverwrites(templateChannel.overwrites, existingChannel.overwrites);
+                    if (overwriteChanges.length > 0) {
+                        changes.overwrites = overwriteChanges;
+                        hasChanges = true;
                     }
 
-                    if (Object.keys(changes).length > 0) {
+                    if (hasChanges) {
                         result.channels.toUpdate.push({ existing: existingChannel, changes, categoryName: templateCategory.name });
                     } else {
                         result.channels.toSkip.push(existingChannel);
