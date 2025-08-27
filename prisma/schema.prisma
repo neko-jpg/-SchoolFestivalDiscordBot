@@ -60,3 +60,21 @@ model CongestionReport {
 
   @@index([location, createdAt])
 }
+
+model Template {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BuildRun {
+  id           String   @id @default(cuid())
+  templateName String
+  dryRunResult Json
+  snapshot     Json
+  status       String // PENDING, SUCCESS, FAILED
+  executedBy   String
+  createdAt    DateTime @default(now())
+}
