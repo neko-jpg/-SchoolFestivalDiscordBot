@@ -7,12 +7,20 @@ import logger from './logger';
 
 const commands: any[] = [];
 const commandsDir = path.join(__dirname, 'commands');
-for (const file of fs.readdirSync(commandsDir).filter(f => f.endsWith('.ts') || f.endsWith('.js'))) {
+for (const file of fs
+  .readdirSync(commandsDir)
+  .filter((f) => f.endsWith('.ts') || f.endsWith('.js'))
+) {
   const filePath = path.join(commandsDir, file);
   try {
-    const c = require(filePath);
-    if (c?.data?.toJSON) commands.push(c.data.toJSON());
-    else logger.warn({ filePath }, 'Skip: no data.toJSON');
+    const imported = require(filePath);
+    const c = imported.default ?? imported;
+    if (c?.data?.toJSON) {
+      commands.push(c.data.toJSON());
+      logger.info({ command: c.data.name }, 'Prepared command for deploy');
+    } else {
+      logger.warn({ filePath }, 'Skip: no data.toJSON');
+    }
   } catch (err) {
     logger.error({ err, filePath }, 'Skip broken command on deploy');
   }
