@@ -2,6 +2,7 @@ import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, ActionRowBuilder
 import { getGuildState, GuildState } from '../services/discordService';
 import { diffTemplate, DiffResult, OverwriteChanges } from '../services/diffService';
 import { executeBuild } from '../services/executionService';
+import { validateBuild } from '../services/validationService';
 import { ServerTemplate } from '../types/template';
 import * as fs from 'fs/promises';
 import path from 'path';
@@ -94,7 +95,18 @@ module.exports = {
             currentState = await getGuildState(interaction.guild);
             diff = diffTemplate(currentState, template);
 
-            // 2. Format and send the preview
+            // 2. Validate that the build is possible
+            const validationErrors = validateBuild(interaction.guild, diff);
+            if (validationErrors.length > 0) {
+                const errorEmbed = new EmbedBuilder()
+                    .setColor('#E74C3C')
+                    .setTitle('Validation Failed')
+                    .setDescription('The build cannot proceed due to the following errors:\n\n' + validationErrors.join('\n'));
+                await interaction.editReply({ embeds: [errorEmbed], components: [] });
+                return;
+            }
+
+            // 3. Format and send the preview
             const previewEmbed = formatDiffPreview(diff, templateName);
             const actionRow = new ActionRowBuilder<ButtonBuilder>()
                 .addComponents(
