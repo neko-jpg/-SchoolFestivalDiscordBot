@@ -1,9 +1,19 @@
 import { Client, GatewayIntentBits, Collection, Interaction, Partials } from 'discord.js';
-import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
-config();
+// --- Global Error Handlers ---
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exitCode = 1;
+});
+// --- End Global Error Handlers ---
+import { env } from './env';
+import { disconnectPrisma } from './prisma';
+import { executeRollback } from './services/rollbackService';
 
 // Define a type for the client that includes our commands collection
 interface CustomClient extends Client {
@@ -44,8 +54,6 @@ client.once('ready', () => {
     console.log('Ready! But user is not available.');
   }
 });
-
-import { executeRollback } from './services/rollbackService';
 
 client.on('interactionCreate', async (interaction: Interaction) => {
   if (interaction.isChatInputCommand()) {
@@ -102,10 +110,12 @@ client.on('interactionCreate', async (interaction: Interaction) => {
   }
 });
 
-const token = process.env.DISCORD_TOKEN;
-if (!token) {
-  console.error('Error: DISCORD_TOKEN is not set in the .env file.');
-  process.exit(1);
-}
+client.login(env.DISCORD_TOKEN);
 
-client.login(token);
+process.on('SIGINT', async () => {
+  console.log('Received SIGINT. Shutting down gracefully...');
+  await disconnectPrisma();
+  client.destroy();
+  console.log('Clients disconnected. Exiting.');
+  process.exit(0);
+});

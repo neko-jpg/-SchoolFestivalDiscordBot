@@ -2,6 +2,7 @@ import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, PermissionFlagsB
 import getPrisma from '../prisma';
 import sharp from 'sharp';
 import path from 'path';
+import fs from 'fs';
 
 // --- Configuration ---
 // Using path.resolve to ensure the path is correct regardless of execution context.
@@ -72,6 +73,20 @@ module.exports = {
         });
         await interaction.reply({ content: `Successfully reported **${location}** as level **${level}** congestion.`, ephemeral: true });
       } else if (subcommand === 'view') {
+        // --- Pre-flight Check for Assets ---
+        const requiredAssets = [baseMapPath, ...Object.values(overlayImages)];
+        const missingAssets = requiredAssets.filter(p => !fs.existsSync(p));
+
+        if (missingAssets.length > 0) {
+            const missingFiles = missingAssets.map(p => path.basename(p)).join(', ');
+            await interaction.reply({
+                content: `❌ **Asset Error:** The following required image files are missing on the server: \`${missingFiles}\`.\nPlease ask the administrator to place them in the \`assets\` directory.`,
+                ephemeral: true
+            });
+            return;
+        }
+        // --- End Check ---
+
         await interaction.deferReply();
 
         const latestReports = await prisma.congestionReport.findMany({

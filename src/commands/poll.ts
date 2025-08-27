@@ -68,11 +68,16 @@ module.exports = {
         const choices = pollEmbed.description?.split('\n') || [];
 
         for (const line of choices) {
-            const emoji = line.match(/([\u{1f1e6}-\u{1f1ff}\u{1f300}-\u{1f5ff}\u{1f600}-\u{1f64f}\u{1f680}-\u{1f6ff}\u{2600}-\u{26ff}\u{2700}-\u{27bf}\u{1f900}-\u{1f9ff}\u{1f018}-\u{1f270}])/u);
-            if (emoji) {
-                const reaction = pollMessage.reactions.cache.get(emoji[0]);
+            const parts = line.trim().split(' ');
+            if (parts.length < 2) continue;
+
+            const emoji = parts[0];
+            const choiceText = parts.slice(1).join(' ');
+
+            if (choiceEmojis.includes(emoji)) {
+                const reaction = pollMessage.reactions.cache.get(emoji);
                 const count = reaction ? reaction.count - 1 : 0; // Subtract bot's own reaction
-                results.push({ choice: line, count });
+                results.push({ choice: choiceText, emoji: emoji, count });
             }
         }
 
@@ -81,16 +86,22 @@ module.exports = {
         const resultsEmbed = new EmbedBuilder()
             .setColor('#992D22')
             .setTitle(`Results for: ${pollEmbed.title}`)
-            .setDescription(results.map(r => `${r.choice}: **${r.count} votes**`).join('\n'));
+            .setDescription(results.length > 0 ? results.map(r => `${r.emoji} ${r.choice}: **${r.count} votes**`).join('\n') : 'No votes were cast.');
 
         await interaction.reply({ embeds: [resultsEmbed] });
 
         const closedEmbed = EmbedBuilder.from(pollEmbed).setFooter({text: 'This poll is now closed.'});
-        await pollMessage.edit({ embeds: [closedEmbed] });
+        await pollMessage.edit({ embeds: [closedEmbed], components: [] });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Poll command error:', error);
-      await interaction.reply({ content: 'An error occurred while handling the poll.', ephemeral: true });
+      const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
+      const replyPayload = { content: `An error occurred while handling the poll:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(replyPayload);
+      } else {
+        await interaction.reply(replyPayload);
+      }
     }
   },
 };

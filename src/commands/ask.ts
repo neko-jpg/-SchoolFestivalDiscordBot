@@ -2,8 +2,9 @@ import { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits, SlashComm
 import getPrisma from '../prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as kuromoji from 'kuromoji';
+import { env } from '../env';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 
 // --- Kuromoji Tokenizer Initialization (Lazy) ---
 let tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures> | null = null;
@@ -69,8 +70,8 @@ module.exports = {
         await interaction.reply({ content: `I've remembered about "${keyword}".`, ephemeral: true });
 
       } else if (subcommand === 'question') {
-        if (!process.env.GEMINI_API_KEY) {
-            return interaction.reply({ content: 'The AI Help Desk is not configured.', ephemeral: true });
+        if (!env.GEMINI_API_KEY) {
+            return interaction.reply({ content: 'The AI Help Desk is not configured. The `GEMINI_API_KEY` has not been set.', ephemeral: true });
         }
         await interaction.deferReply();
         const query = interaction.options.getString('query', true);
