@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
+import { zonedTimeToUtc } from 'date-fns-tz';
 import prisma from '../prisma';
 
 module.exports = {
@@ -15,18 +16,31 @@ module.exports = {
         where: { guildId: interaction.guildId },
     });
 
-    if (!config || !config.festivalStartDate) {
+    const festivalDateFromEnv = process.env.FESTIVAL_START_DATE;
+    const festivalDateFromDb = config?.festivalStartDate;
+
+    if (!festivalDateFromDb && !festivalDateFromEnv) {
       await interaction.reply({ content: '文化祭の開始日が設定されていません。`/config startdate`で設定してください。', ephemeral: true });
       return;
     }
 
-    const festivalDate = config.festivalStartDate;
-    const now = new Date();
+    // Prioritize DB date over ENV var
+    const startDate = festivalDateFromDb || new Date(festivalDateFromEnv as string);
 
+    // Interpret the date as being in Asia/Tokyo timezone
+    const timeZone = 'Asia/Tokyo';
+    // We assume the date stored is the "wall clock" date. Let's create a proper, timezone-aware date object.
+    // Let's assume the festival starts at 9:00 AM JST on the given date.
+    const festivalDate = zonedTimeToUtc(
+        `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}T09:00:00`,
+        timeZone
+    );
+
+    const now = new Date(); // Represents the current moment in UTC
     const diff = festivalDate.getTime() - now.getTime();
 
     if (diff <= 0) {
-      await interaction.reply('The festival is already happening or has passed! 🎉');
+      await interaction.reply('文化祭はすでに開催中、または終了しました！ 🎉');
       return;
     }
 

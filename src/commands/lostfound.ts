@@ -44,32 +44,51 @@ module.exports = {
             foundLocation,
             imageUrl: image?.url,
             reportedById: interaction.user.id,
-            status: '保管中',
+            // After prisma generate, this can be LostItemStatus.IN_STORAGE
+            status: 'IN_STORAGE',
           },
         });
         await interaction.reply(`Reported lost item: **${itemName}**. Assigned ID: **${newItem.id}**`);
       } else if (subcommand === 'list') {
+        await interaction.deferReply();
         const items = await prisma.lostItem.findMany({
-          where: { status: '保管中' },
+          // After prisma generate, this can be LostItemStatus.IN_STORAGE
+          where: { status: 'IN_STORAGE' },
           orderBy: { createdAt: 'desc' },
         });
 
         if (items.length === 0) {
-          await interaction.reply('No lost items have been reported.');
+          await interaction.editReply('No lost items have been reported.');
           return;
         }
 
-        const embed = new EmbedBuilder().setColor('#E74C3C').setTitle('Lost & Found Items');
-        items.forEach(item => {
-          embed.addFields({
-            name: `${item.itemName} (ID: ${item.id})`,
-            value: `Found at: ${item.foundLocation}\nReported by: <@${item.reportedById}>`,
-          });
-          if(item.imageUrl) {
-            embed.setImage(item.imageUrl); // Note: only the last image will be shown if there are many. A better approach is multiple embeds.
-          }
+        const embeds = items.map(item => {
+            const embed = new EmbedBuilder()
+                .setColor('#E74C3C')
+                .setTitle(item.itemName)
+                .addFields(
+                    { name: 'Item ID', value: item.id, inline: true },
+                    { name: 'Found Location', value: item.foundLocation, inline: true },
+                    { name: 'Reported By', value: `<@${item.reportedById}>`, inline: true },
+                )
+                .setTimestamp(item.createdAt);
+
+            if (item.imageUrl) {
+                embed.setImage(item.imageUrl);
+            }
+            return embed;
         });
-        await interaction.reply({ embeds: [embed] });
+
+        // Discord allows up to 10 embeds per message
+        const chunkSize = 10;
+        for (let i = 0; i < embeds.length; i += chunkSize) {
+            const chunk = embeds.slice(i, i + chunkSize);
+            if (i === 0) {
+                await interaction.editReply({ embeds: chunk });
+            } else {
+                await interaction.followUp({ embeds: chunk });
+            }
+        }
 
       } else if (subcommand === 'claim') {
         const itemId = interaction.options.getString('id', true);
@@ -77,7 +96,8 @@ module.exports = {
         try {
           const updatedItem = await prisma.lostItem.update({
             where: { id: itemId },
-            data: { status: '返却済' },
+            // After prisma generate, this can be LostItemStatus.RETURNED
+            data: { status: 'RETURNED' },
           });
           await interaction.reply(`Item **${updatedItem.itemName}** (ID: ${itemId}) has been marked as claimed.`);
         } catch (error) {

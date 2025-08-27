@@ -6,13 +6,15 @@ import path from 'path';
 const prisma = new PrismaClient();
 
 // --- Configuration ---
+// Using path.resolve to ensure the path is correct regardless of execution context.
+const assetsPath = path.resolve(process.cwd(), 'assets');
 // User must provide a map.png in the assets directory.
-const baseMapPath = path.join(__dirname, '..', '..', 'assets', 'map.png');
+const baseMapPath = path.join(assetsPath, 'map.png');
 // User must provide these dot images in the assets directory.
 const overlayImages = {
-  1: path.join(__dirname, '..', '..', 'assets', 'green_dot.png'), // Low
-  2: path.join(__dirname, '..', '..', 'assets', 'yellow_dot.png'), // Medium
-  3: path.join(__dirname, '..', '..', 'assets', 'red_dot.png'), // High
+  1: path.join(assetsPath, 'green_dot.png'), // Low
+  2: path.join(assetsPath, 'yellow_dot.png'), // Medium
+  3: path.join(assetsPath, 'red_dot.png'), // High
 };
 const locations = {
   'Main Gate': { top: 100, left: 150 },
