@@ -66,6 +66,19 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         await interaction.reply(reply);
       }
     }
+  } else if (interaction.isAutocomplete()) {
+    const command = client.commands.get(interaction.commandName);
+    if (!command) {
+        console.error(`No command matching ${interaction.commandName} was found.`);
+        return;
+    }
+    try {
+        if (command.autocomplete) {
+            await command.autocomplete(interaction);
+        }
+    } catch (error) {
+        console.error(error);
+    }
   } else if (interaction.isButton()) {
     if (interaction.customId.startsWith('build-undo-')) {
       if (!interaction.guild) {
