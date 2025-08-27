@@ -3,8 +3,8 @@ import { getGuildState, GuildState } from '../services/discordService';
 import { diffTemplate, DiffResult, OverwriteChanges } from '../services/diffService';
 import { executeBuild } from '../services/executionService';
 import { validateBuild } from '../services/validationService';
-import { ServerTemplate } from '../types/template';
-import * as fs from 'fs/promises';
+import { loadAndValidateTemplate } from '../services/templateService';
+import { ServerTemplate } from '../schemas/templateSchema';
 import path from 'path';
 
 function formatOverwriteChanges(changes: OverwriteChanges[]): string {
@@ -80,8 +80,7 @@ module.exports = {
 
         try {
             const templatePath = path.resolve(process.cwd(), 'template.json');
-            const templateFile = await fs.readFile(templatePath, 'utf-8');
-            const template: ServerTemplate = JSON.parse(templateFile);
+            const template = await loadAndValidateTemplate(templatePath);
 
             currentState = await getGuildState(interaction.guild);
             diff = diffTemplate(currentState, template);
@@ -146,9 +145,13 @@ module.exports = {
                 }
             });
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error during build preview:", error);
-            await interaction.editReply({ content: 'An error occurred while generating the preview.', embeds:[], components: [] });
+            const errorEmbed = new EmbedBuilder()
+                .setColor('#E74C3C')
+                .setTitle('An Error Occurred')
+                .setDescription(error.message || 'An unknown error occurred while generating the preview.');
+            await interaction.editReply({ content: '', embeds: [errorEmbed], components: [] });
         }
     }
   },
