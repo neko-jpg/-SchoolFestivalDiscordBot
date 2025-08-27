@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, Role, GuildMember, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder, AutocompleteInteraction, ChatInputCommandInteraction } from 'discord.js';
 import { filterMembers } from '../services/filterService';
-import prisma from '../prisma';
+import getPrisma from '../prisma';
 import PQueue from 'p-queue';
 
 module.exports = {
@@ -44,6 +44,7 @@ module.exports = {
             )
     ),
   async autocomplete(interaction: AutocompleteInteraction) {
+    const prisma = getPrisma();
     const focusedOption = interaction.options.getFocused(true);
     if (focusedOption.name === 'segment') {
         const segments = await prisma.segment.findMany({
@@ -64,6 +65,7 @@ module.exports = {
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.guild) return;
 
+    const prisma = getPrisma();
     const group = interaction.options.getSubcommandGroup();
 
     if (group === 'segment') {

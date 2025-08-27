@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import { fromZonedTime } from 'date-fns-tz';
-import prisma from '../prisma';
+import getPrisma from '../prisma';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -12,6 +12,7 @@ module.exports = {
         return;
     }
 
+    const prisma = getPrisma();
     const config = await prisma.guildConfig.findUnique({
         where: { guildId: interaction.guildId },
     });

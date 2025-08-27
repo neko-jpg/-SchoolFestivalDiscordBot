@@ -1,5 +1,5 @@
 import * as fs from 'fs/promises';
-import { ZodError } from 'zod';
+import { ZodError, ZodIssue } from 'zod';
 import { ServerTemplate, ServerTemplateSchema } from '../schemas/templateSchema';
 
 class TemplateValidationError extends Error {
@@ -33,7 +33,11 @@ export async function loadAndValidateTemplate(filePath: string): Promise<ServerT
     const validationResult = ServerTemplateSchema.safeParse(jsonData);
 
     if (!validationResult.success) {
-        const errorMessages = validationResult.error.errors.map(e => ` - at path \`${e.path.join('.') || '.'}\`: ${e.message}`);
+        const issues: ZodIssue[] = (validationResult.error as ZodError).issues ?? [];
+        const errorMessages = issues.map((issue) => {
+            const path = (issue.path?.join?.('.') ?? '.') as string;
+            return ` - at path \`${path}\`: ${issue.message}`;
+        });
         throw new TemplateValidationError(`Template validation failed:\n${errorMessages.join('\n')}`);
     }
 
