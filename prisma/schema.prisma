@@ -109,11 +109,7 @@ model GuildConfig {
 
   // ユーザーが設定する項目
   reminderChannelId String?   // ? をつけて、設定がなくても良い項目にする
-  notionDatabaseId  String?
-  googleCalendarId  String?
-  googleSheetId     String?
   festivalStartDate DateTime?
-  expenseFormUrl    String?
 
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

@@ -22,34 +22,10 @@ module.exports = {
         )
     )
     .addSubcommand(subcommand =>
-      subcommand
-        .setName('calendar')
-        .setDescription('GoogleカレンダーのIDを設定します。')
-        .addStringOption(option => option.setName('id').setDescription('カレンダーID').setRequired(true))
-    )
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('notion')
-        .setDescription('NotionデータベースのIDを設定します。')
-        .addStringOption(option => option.setName('id').setDescription('データベースID').setRequired(true))
-    )
-    .addSubcommand(subcommand =>
-        subcommand
-          .setName('sheet')
-          .setDescription('会計報告用のGoogleスプレッドシートのIDを設定します。')
-          .addStringOption(option => option.setName('id').setDescription('スプレッドシートID').setRequired(true))
-    )
-    .addSubcommand(subcommand =>
         subcommand
           .setName('startdate')
           .setDescription('文化祭の開始日を設定します (YYYY-MM-DD)。')
           .addStringOption(option => option.setName('date').setDescription('開始日 (例: 2025-10-25)').setRequired(true))
-    )
-    .addSubcommand(subcommand =>
-        subcommand
-          .setName('expenseform')
-          .setDescription('経費報告フォームのURLを設定します。')
-          .addStringOption(option => option.setName('url').setDescription('フォームのURL').setRequired(true))
     ),
 
   async execute(interaction: CommandInteraction) {
@@ -70,36 +46,6 @@ module.exports = {
           await interaction.reply({ content: `✅ リマインダーチャンネルを <#${channel.id}> に設定しました。`, ephemeral: true });
           break;
         }
-        case 'calendar': {
-          const calendarId = interaction.options.getString('id', true);
-          await prisma.guildConfig.upsert({
-            where: { guildId },
-            update: { googleCalendarId: calendarId },
-            create: { guildId, googleCalendarId: calendarId },
-          });
-          await interaction.reply({ content: `✅ GoogleカレンダーIDを設定しました。`, ephemeral: true });
-          break;
-        }
-        case 'notion': {
-            const notionId = interaction.options.getString('id', true);
-            await prisma.guildConfig.upsert({
-              where: { guildId },
-              update: { notionDatabaseId: notionId },
-              create: { guildId, notionDatabaseId: notionId },
-            });
-            await interaction.reply({ content: `✅ NotionデータベースIDを設定しました。`, ephemeral: true });
-            break;
-        }
-        case 'sheet': {
-            const sheetId = interaction.options.getString('id', true);
-            await prisma.guildConfig.upsert({
-              where: { guildId },
-              update: { googleSheetId: sheetId },
-              create: { guildId, googleSheetId: sheetId },
-            });
-            await interaction.reply({ content: `✅ GoogleスプレッドシートIDを設定しました。`, ephemeral: true });
-            break;
-        }
         case 'startdate': {
             const dateStr = interaction.options.getString('date', true);
             const validation = dateSchema.safeParse(dateStr);
@@ -114,16 +60,6 @@ module.exports = {
               create: { guildId, festivalStartDate: startDate },
             });
             await interaction.reply({ content: `✅ 文化祭開始日を ${dateStr} に設定しました。`, ephemeral: true });
-            break;
-        }
-        case 'expenseform': {
-            const url = interaction.options.getString('url', true);
-            await prisma.guildConfig.upsert({
-              where: { guildId },
-              update: { expenseFormUrl: url },
-              create: { guildId, expenseFormUrl: url },
-            });
-            await interaction.reply({ content: `✅ 経費報告フォームのURLを設定しました。`, ephemeral: true });
             break;
         }
       }

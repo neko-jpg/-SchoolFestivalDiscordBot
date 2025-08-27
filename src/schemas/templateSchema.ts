@@ -29,7 +29,7 @@ const TemplateRoleSchema = z.object({
 });
 
 export const ServerTemplateSchema = z.object({
-  version: z.literal('1', { errorMap: () => ({ message: "Template version must be '1'." }) }),
+  version: z.literal('1', { message: "Template version must be '1'." }),
   name: z.string().min(1, { message: "Template name cannot be empty." }),
   roles: z.array(TemplateRoleSchema).optional(),
   categories: z.array(TemplateCategorySchema).optional(),

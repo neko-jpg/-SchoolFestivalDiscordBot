@@ -1,22 +1,25 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 import { getGuildState, GuildState } from '../services/discordService';
-import { diffTemplate, DiffResult, OverwriteChanges } from '../services/diffService';
+import { diffTemplate, DiffResult, ChannelChanges } from '../services/diffService';
 import { executeBuild } from '../services/executionService';
 import { validateBuild } from '../services/validationService';
 import { loadAndValidateTemplate } from '../services/templateService';
 import { ServerTemplate } from '../schemas/templateSchema';
 import path from 'path';
 
-function formatOverwriteChanges(changes: OverwriteChanges[]): string {
+/*
+function formatOverwriteChanges(changes: any[]): string {
     return changes.map(c => {
         const parts: string[] = [];
-        if (c.addedAllow.length > 0) parts.push(`+Allow(${c.addedAllow.join(', ')})`);
-        if (c.removedAllow.length > 0) parts.push(`-Allow(${c.removedAllow.join(', ')})`);
-        if (c.addedDeny.length > 0) parts.push(`+Deny(${c.addedDeny.join(', ')})`);
-        if (c.removedDeny.length > 0) parts.push(`-Deny(${c.removedDeny.join(', ')})`);
+        // This logic is broken as diffService doesn't provide this level of detail.
+        // if (c.addedAllow.length > 0) parts.push(`+Allow(${c.addedAllow.join(', ')})`);
+        // if (c.removedAllow.length > 0) parts.push(`-Allow(${c.removedAllow.join(', ')})`);
+        // if (c.addedDeny.length > 0) parts.push(`+Deny(${c.addedDeny.join(', ')})`);
+        // if (c.removedDeny.length > 0) parts.push(`-Deny(${c.removedDeny.join(', ')})`);
         return `  - For @${c.roleName}: ${parts.join(' ')}`;
     }).join('\n');
 }
+*/
 
 function formatDiffPreview(diff: DiffResult, templateName: string): EmbedBuilder {
     const embed = new EmbedBuilder()
@@ -37,7 +40,8 @@ function formatDiffPreview(diff: DiffResult, templateName: string): EmbedBuilder
             description += `  - Topic will be updated.\n`;
         }
         if (c.changes.overwrites && c.changes.overwrites.length > 0) {
-            description += formatOverwriteChanges(c.changes.overwrites) + '\n';
+            // description += formatOverwriteChanges(c.changes.overwrites) + '\n';
+            description += `  - Permissions will be updated.\n`;
         }
     });
 

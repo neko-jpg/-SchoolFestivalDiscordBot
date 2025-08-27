@@ -24,18 +24,12 @@ module.exports = {
       try {
         await interaction.deferReply();
 
-        const [kudosGiven, kudosReceived, itemsReported, shifts] = await Promise.all([
+        const [kudosGiven, kudosReceived, itemsReported, shiftCount] = await Promise.all([
           prisma.kudos.count({ where: { fromUserId: targetUser.id } }),
           prisma.kudos.count({ where: { toUserId: targetUser.id } }),
           prisma.lostItem.count({ where: { reportedById: targetUser.id } }),
-          prisma.shift.findMany({ where: { assignees: { path: '$[*].id', array_contains: targetUser.id } } }), // This is complex and might not work on all DBs
+          prisma.shift.count({ where: { assignees: { some: { id: targetUser.id } } } })
         ]);
-
-        // A more reliable way to count shifts, albeit less efficient if there are many shifts
-        const allShifts = await prisma.shift.findMany();
-        const shiftCount = allShifts.filter(shift =>
-            (shift.assignees as any[]).some(a => a.id === targetUser.id)
-        ).length;
 
         const embed = new EmbedBuilder()
           .setColor('#FFD700')
@@ -52,7 +46,7 @@ module.exports = {
         await interaction.editReply({ embeds: [embed] });
       } catch (error) {
         console.error('Achievements command error:', error);
-        await interaction.editReply({ content: 'An error occurred while fetching achievements.', ephemeral: true });
+        await interaction.editReply({ content: 'An error occurred while fetching achievements.' });
       }
     }
   },

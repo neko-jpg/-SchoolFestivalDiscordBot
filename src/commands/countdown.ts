@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
-import { zonedTimeToUtc } from 'date-fns-tz';
+import { fromZonedTime } from 'date-fns-tz';
 import prisma from '../prisma';
 
 module.exports = {
@@ -31,7 +31,7 @@ module.exports = {
     const timeZone = 'Asia/Tokyo';
     // We assume the date stored is the "wall clock" date. Let's create a proper, timezone-aware date object.
     // Let's assume the festival starts at 9:00 AM JST on the given date.
-    const festivalDate = zonedTimeToUtc(
+    const festivalDate = fromZonedTime(
         `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}T09:00:00`,
         timeZone
     );
