@@ -1,5 +1,5 @@
 import { Guild, OverwriteResolvable, PermissionsString } from 'discord.js';
-import prisma from '../prisma';
+import getPrisma from '../prisma';
 import { DiffResult } from './diffService';
 import { SimpleOverwrite } from './discordService';
 
@@ -29,6 +29,7 @@ async function mapOverwritesFromSnapshot(guild: Guild, snapshotOverwrites: Simpl
  * @param guild The guild where the rollback should occur.
  */
 export async function executeRollback(buildRunId: string, guild: Guild) {
+    const prisma = getPrisma();
     const buildRun = await prisma.buildRun.findUnique({ where: { id: buildRunId } });
 
     if (!buildRun) throw new Error('Build run not found.');

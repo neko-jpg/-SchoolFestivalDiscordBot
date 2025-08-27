@@ -1,5 +1,5 @@
 import { ChannelType, Guild, OverwriteResolvable, PermissionsString } from 'discord.js';
-import prisma from '../prisma';
+import getPrisma from '../prisma';
 import { TemplateRoleOverwrite } from '../types/template';
 import { DiffResult } from './diffService';
 import { GuildState } from './discordService';
@@ -35,6 +35,7 @@ async function mapOverwrites(guild: Guild, templateOverwrites: TemplateRoleOverw
  * Executes the changes determined by the diffing service and returns the build run record.
  */
 export async function executeBuild(guild: Guild, diff: DiffResult, currentState: GuildState, templateName: string, userId: string) {
+    const prisma = getPrisma();
     const buildRun = await prisma.buildRun.create({
         data: {
             templateName: templateName,

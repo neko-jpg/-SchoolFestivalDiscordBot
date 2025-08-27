@@ -1,9 +1,7 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, PermissionFlagsBits, AttachmentBuilder } from 'discord.js';
-import { PrismaClient } from '@prisma/client';
+import getPrisma from '../prisma';
 import sharp from 'sharp';
 import path from 'path';
-
-const prisma = new PrismaClient();
 
 // --- Configuration ---
 // Using path.resolve to ensure the path is correct regardless of execution context.
@@ -58,6 +56,7 @@ module.exports = {
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
     const subcommand = interaction.options.getSubcommand();
+    const prisma = getPrisma();
 
     try {
       if (subcommand === 'report') {

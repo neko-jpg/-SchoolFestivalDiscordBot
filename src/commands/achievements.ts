@@ -1,7 +1,5 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import getPrisma from '../prisma';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -24,6 +22,7 @@ module.exports = {
       try {
         await interaction.deferReply();
 
+        const prisma = getPrisma();
         const [kudosGiven, kudosReceived, itemsReported, shiftCount] = await Promise.all([
           prisma.kudos.count({ where: { fromUserId: targetUser.id } }),
           prisma.kudos.count({ where: { toUserId: targetUser.id } }),

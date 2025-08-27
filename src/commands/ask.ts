@@ -1,9 +1,8 @@
 import { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits } from 'discord.js';
-import { PrismaClient } from '@prisma/client';
+import getPrisma from '../prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as kuromoji from 'kuromoji';
 
-const prisma = new PrismaClient();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // --- Kuromoji Tokenizer Initialization ---
@@ -40,6 +39,7 @@ module.exports = {
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
 
+    const prisma = getPrisma();
     const subcommand = interaction.options.getSubcommand();
 
     try {

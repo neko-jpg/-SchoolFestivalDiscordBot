@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits, ChannelType } from 'discord.js';
-import prisma from '../prisma'; // Prismaクライアントをインポート
+import getPrisma from '../prisma'; // Prismaクライアントをインポート
 import { z } from 'zod';
 
 // 日付形式 (YYYY-MM-DD) を検証するためのZodスキーマ
@@ -31,6 +31,7 @@ module.exports = {
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand() || !interaction.inGuild()) return;
 
+    const prisma = getPrisma();
     const subcommand = interaction.options.getSubcommand();
     const guildId = interaction.guildId;
 

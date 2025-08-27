@@ -1,7 +1,5 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import getPrisma from '../prisma';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -30,6 +28,7 @@ module.exports = {
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
 
+    const prisma = getPrisma();
     const subcommand = interaction.options.getSubcommand();
 
     try {
@@ -55,8 +54,8 @@ module.exports = {
           return;
         }
         const embed = new EmbedBuilder().setColor('#FFC300').setTitle('Shift Roster');
-        shifts.forEach(shift => {
-          const assignees = shift.assignees.map(user => user.tag || user.id).join(', ') || 'None';
+        shifts.forEach((shift) => {
+          const assignees = shift.assignees.map((user: { tag: string | null; id: string }) => user.tag || user.id).join(', ') || 'None';
           embed.addFields({
             name: `${shift.name} @ ${shift.location} (${shift.time})`,
             value: `**ID:** ${shift.id}\n**Assigned:** ${assignees}`,

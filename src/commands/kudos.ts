@@ -1,7 +1,5 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import getPrisma from '../prisma';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -22,6 +20,7 @@ module.exports = {
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
 
+    const prisma = getPrisma();
     const subcommand = interaction.options.getSubcommand();
 
     try {
