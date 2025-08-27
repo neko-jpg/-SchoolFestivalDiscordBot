@@ -20,12 +20,20 @@ const client = new Client({
 client.commands = new Collection<string, Command>();
 
 const commandsPath = path.join(__dirname, 'commands');
-for (const file of fs.readdirSync(commandsPath).filter(f => f.endsWith('.ts') || f.endsWith('.js'))) {
+for (const file of fs
+  .readdirSync(commandsPath)
+  .filter((f) => f.endsWith('.ts') || f.endsWith('.js'))
+) {
   const filePath = path.join(commandsPath, file);
   try {
-    const cmd: Command = require(filePath);
-    if (cmd?.data?.name && typeof cmd.execute === 'function') client.commands.set(cmd.data.name, cmd);
-    else logger.warn({ filePath }, 'Invalid command module shape, skipped');
+    const imported = require(filePath);
+    const cmd: Command = (imported.default ?? imported) as Command;
+    if (cmd?.data?.name && typeof cmd.execute === 'function') {
+      client.commands.set(cmd.data.name, cmd);
+      logger.info({ command: cmd.data.name }, 'Loaded command');
+    } else {
+      logger.warn({ filePath }, 'Invalid command module shape, skipped');
+    }
   } catch (err) {
     logger.error({ err, filePath }, 'Failed to load command (skipped)');
   }
