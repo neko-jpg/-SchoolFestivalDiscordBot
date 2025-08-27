@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, TextChannel } from 'discord.js';
+import logger from '../logger';
 
 const choiceEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
@@ -94,7 +95,7 @@ module.exports = {
         await pollMessage.edit({ embeds: [closedEmbed], components: [] });
       }
     } catch (error: any) {
-      console.error('Poll command error:', error);
+      logger.error({ err: error, subcommand, user: interaction.user.id }, 'Poll command failed');
       const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
       const replyPayload = { content: `An error occurred while handling the poll:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
       if (interaction.replied || interaction.deferred) {

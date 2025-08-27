@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits, ChannelType } from 'discord.js';
 import getPrisma from '../prisma'; // Prismaクライアントをインポート
 import { z } from 'zod';
+import logger from '../logger';
 
 // 日付形式 (YYYY-MM-DD) を検証するためのZodスキーマ
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日付はYYYY-MM-DD形式で入力してください。");
@@ -66,7 +67,7 @@ module.exports = {
         }
       }
     } catch (error: any) {
-        console.error('Config command error:', error);
+        logger.error({ err: error, subcommand, guildId }, 'Config command failed');
         const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
         const replyPayload = { content: `設定の保存中にエラーが発生しました:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
         if (interaction.replied || interaction.deferred) {

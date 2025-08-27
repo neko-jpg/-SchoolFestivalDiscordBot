@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, PermissionFlagsBits, AttachmentBuilder } from 'discord.js';
 import getPrisma from '../prisma';
+import logger from '../logger';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
@@ -117,8 +118,8 @@ module.exports = {
         const attachment = new AttachmentBuilder(imageBuffer, { name: 'congestion-map.png' });
         await interaction.editReply({ files: [attachment] });
       }
-    } catch (error) {
-      console.error('Congestion command error:', error);
+    } catch (error: any) {
+      logger.error({ err: error, subcommand, user: interaction.user.id }, 'Congestion command failed');
       if (error instanceof Error && error.message.includes('Input file is missing')) {
           await interaction.followUp('Error: The map image file (`assets/map.png`) or dot images are missing on the server. Please contact an administrator.');
       } else {

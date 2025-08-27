@@ -6,6 +6,7 @@ import { validateBuild } from '../services/validationService';
 import { loadAndValidateTemplate } from '../services/templateService';
 import { ServerTemplate } from '../schemas/templateSchema';
 import path from 'path';
+import logger from '../logger';
 
 /*
 function formatOverwriteChanges(changes: any[]): string {
@@ -162,7 +163,7 @@ module.exports = {
                         await i.editReply({ content: finalMessage, components: [resultRow] });
 
                     } catch (error: any) {
-                        console.error("Catastrophic error during build execution:", error);
+                        logger.fatal({ err: error, user: i.user.id }, "Catastrophic error during build execution");
                         const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
                         await i.editReply({ content: `❌ An unexpected catastrophic error occurred during execution:\n\`\`\`\n${msg}\n\`\`\``, components: [] });
                     }
@@ -178,7 +179,7 @@ module.exports = {
             });
 
         } catch (error: any) {
-            console.error("Error during build preview:", error);
+            logger.error({ err: error, user: interaction.user.id }, "Error during build preview");
             const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
             const errorEmbed = new EmbedBuilder()
                 .setColor('#E74C3C')
