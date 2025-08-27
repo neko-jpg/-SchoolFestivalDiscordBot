@@ -1,11 +1,16 @@
 import { z } from 'zod';
+import { PermissionFlagsBits } from 'discord.js';
+
+// Dynamically create a Zod enum from the keys of PermissionFlagsBits
+const permissionNames = Object.keys(PermissionFlagsBits) as (keyof typeof PermissionFlagsBits)[];
+const PermissionStringSchema = z.enum(permissionNames);
 
 const hexColorRegex = /^#?[0-9a-fA-F]{6}$/;
 
 const TemplateRoleOverwriteSchema = z.object({
   role: z.string().min(1, { message: "Overwrite role name cannot be empty." }),
-  allow: z.array(z.string()).default([]),
-  deny: z.array(z.string()).default([]),
+  allow: z.array(PermissionStringSchema).default([]),
+  deny: z.array(PermissionStringSchema).default([]),
 });
 
 const TemplateChannelSchema = z.object({
