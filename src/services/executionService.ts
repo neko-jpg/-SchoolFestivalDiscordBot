@@ -1,5 +1,6 @@
 import { ChannelType, Guild, OverwriteResolvable, PermissionsString } from 'discord.js';
 import getPrisma from '../prisma';
+import logger from '../logger';
 import { TemplateRoleOverwrite } from '../types/template';
 import { DiffResult } from './diffService';
 import { GuildState } from './discordService';
@@ -25,7 +26,7 @@ async function mapOverwrites(guild: Guild, templateOverwrites: TemplateRoleOverw
                 deny: (overwrite.deny || []) as PermissionsString[],
             });
         } else {
-            console.warn(`Could not find role '${overwrite.role}' for permission overwrite. Skipping.`);
+            logger.warn({ roleName: overwrite.role, guildId: guild.id }, "Could not find role for permission overwrite. Skipping.");
         }
     }
     return results;

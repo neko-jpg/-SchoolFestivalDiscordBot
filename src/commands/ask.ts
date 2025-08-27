@@ -3,6 +3,7 @@ import getPrisma from '../prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as kuromoji from 'kuromoji';
 import { env } from '../env';
+import logger from '../logger';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 
@@ -13,15 +14,15 @@ async function getTokenizer() {
     return tokenizer;
   }
 
-  console.log('Building Kuromoji tokenizer for the first time...');
+  logger.info('Building Kuromoji tokenizer for the first time...');
   return new Promise<kuromoji.Tokenizer<kuromoji.IpadicFeatures>>((resolve, reject) => {
     kuromoji.builder({ dicPath: 'node_modules/kuromoji/dict' }).build((err, builtTokenizer) => {
       if (err) {
-        console.error('FATAL: Failed to build kuromoji tokenizer.', err);
+        logger.fatal({ err }, 'FATAL: Failed to build kuromoji tokenizer.');
         reject(err);
       } else {
         tokenizer = builtTokenizer;
-        console.log('Kuromoji tokenizer built successfully.');
+        logger.info('Kuromoji tokenizer built successfully.');
         resolve(builtTokenizer);
       }
     });
@@ -110,7 +111,7 @@ module.exports = {
         await interaction.editReply(answer);
       }
     } catch (error: any) {
-      console.error('AI Help Desk error:', error);
+      logger.error({ err: error, subcommand, user: interaction.user.id }, 'AI Help Desk command failed.');
       const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
       const replyPayload = { content: `AIヘルプデスクでエラーが発生しました:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
       if (interaction.replied || interaction.deferred) {

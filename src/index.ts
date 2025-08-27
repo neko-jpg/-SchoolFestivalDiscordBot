@@ -1,14 +1,16 @@
 import { Client, GatewayIntentBits, Collection, Interaction, Partials } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
+import logger from './logger';
 
 // --- Global Error Handlers ---
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error({ reason, promise }, 'Unhandled Rejection');
 });
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  process.exitCode = 1;
+  logger.fatal({ err: error }, 'Uncaught Exception, process will exit.');
+  // In a real-world app, you might want to gracefully shut down here before exiting
+  process.exit(1);
 });
 // --- End Global Error Handlers ---
 import { env } from './env';
@@ -39,19 +41,23 @@ const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('
 
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
-  const command = require(filePath);
-  if ('data' in command && 'execute' in command) {
-    client.commands.set(command.data.name, command);
-  } else {
-    console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+  try {
+    const command = require(filePath);
+    if ('data' in command && 'execute' in command) {
+      client.commands.set(command.data.name, command);
+    } else {
+      logger.warn({ filePath }, `Command is missing a required "data" or "execute" property.`);
+    }
+  } catch (error) {
+      logger.error({ err: error, filePath }, 'Failed to load command file.');
   }
 }
 
 client.once('ready', () => {
   if (client.user) {
-    console.log(`Ready! Logged in as ${client.user.tag}`);
+    logger.info({ user: client.user.tag }, 'Ready! Logged in.');
   } else {
-    console.log('Ready! But user is not available.');
+    logger.warn('Ready, but client.user is not available.');
   }
 });
 
@@ -60,14 +66,14 @@ client.on('interactionCreate', async (interaction: Interaction) => {
     const command = client.commands.get(interaction.commandName);
 
     if (!command) {
-      console.error(`No command matching ${interaction.commandName} was found.`);
+      logger.error({ commandName: interaction.commandName }, 'No command matching was found.');
       return;
     }
 
     try {
       await command.execute(interaction);
     } catch (error: any) {
-      console.error(`[${interaction.commandName}]`, error);
+      logger.error({ err: error, commandName: interaction.commandName, user: interaction.user.id, guild: interaction.guild?.id }, 'Error executing command');
       const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
       const reply = { content: `コマンド実行中にエラーが発生しました:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
       if (interaction.replied || interaction.deferred) {
@@ -79,7 +85,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
   } else if (interaction.isAutocomplete()) {
     const command = client.commands.get(interaction.commandName);
     if (!command) {
-        console.error(`No command matching ${interaction.commandName} was found.`);
+        logger.error({ commandName: interaction.commandName }, 'No command matching was found for autocomplete.');
         return;
     }
     try {
@@ -87,7 +93,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
             await command.autocomplete(interaction);
         }
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error, commandName: interaction.commandName }, 'Error executing autocomplete.');
     }
   } else if (interaction.isButton()) {
     if (interaction.customId.startsWith('build-undo-')) {
@@ -103,7 +109,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         await executeRollback(buildRunId, interaction.guild);
         await interaction.editReply({ content: '✅ Rollback successful.' });
       } catch (error: any) {
-        console.error("Error during rollback:", error);
+        logger.error({ err: error, buildRunId, user: interaction.user.id, guild: interaction.guild.id }, 'Error during build rollback');
         await interaction.editReply({ content: `❌ An error occurred during rollback: ${error.message}` });
       }
     }
@@ -113,9 +119,9 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 client.login(env.DISCORD_TOKEN);
 
 process.on('SIGINT', async () => {
-  console.log('Received SIGINT. Shutting down gracefully...');
+  logger.info('Received SIGINT. Shutting down gracefully...');
   await disconnectPrisma();
   client.destroy();
-  console.log('Clients disconnected. Exiting.');
+  logger.info('Clients disconnected. Exiting.');
   process.exit(0);
 });
