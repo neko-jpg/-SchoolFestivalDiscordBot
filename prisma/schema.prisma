@@ -10,12 +10,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id     String  @id // Discord User ID
+  tag    String?
+  shifts Shift[] @relation("ShiftToUser")
+}
+
 model Shift {
   id        String   @id @default(cuid())
   name      String
   time      String
   location  String
-  assignees Json
+  assignees User[]   @relation("ShiftToUser")
 }
 
 model InventoryItem {
@@ -34,13 +40,18 @@ model Kudos {
   createdAt  DateTime @default(now())
 }
 
+enum LostItemStatus {
+  IN_STORAGE // 保管中
+  RETURNED   // 返却済
+}
+
 model LostItem {
   id            String   @id @default(cuid())
   itemName      String
   foundLocation String
   imageUrl      String?
   reportedById  String
-  status        String   @default("保管中") // "保管中" or "返却済"
+  status        LostItemStatus @default(IN_STORAGE)
   createdAt     DateTime @default(now())
 }
 

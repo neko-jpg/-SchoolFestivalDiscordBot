@@ -5,9 +5,22 @@ import prisma from '../prisma';
 // Initialize Notion Client
 const notion = new NotionClient({ auth: process.env.NOTION_API_KEY });
 
+// Get Notion column names from environment variables
+const {
+  NOTION_NAME_COLUMN = 'Name',
+  NOTION_OWNER_COLUMN = 'Owner',
+  NOTION_DUEDATE_COLUMN = 'Due Date',
+  NOTION_STATUS_COLUMN = 'Status',
+  NOTION_STATUS_PENDING = 'Pending',
+} = process.env;
+
 if (!process.env.NOTION_API_KEY) {
   console.warn('Notion API Key not set. The /submit command will be disabled.');
 }
+if (!process.env.NOTION_NAME_COLUMN) {
+    console.warn('One or more Notion column names are not set in the environment variables. Using default values.');
+}
+
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -37,6 +50,12 @@ module.exports = {
       return;
     }
 
+    // Also check for the column names at runtime
+    if (!process.env.NOTION_NAME_COLUMN) {
+        await interaction.reply({ content: 'Notionの列名設定が不完全です。管理者に連絡してください。', ephemeral: true });
+        return;
+    }
+
     const config = await prisma.guildConfig.findUnique({
         where: { guildId: interaction.guildId },
     });
@@ -56,11 +75,10 @@ module.exports = {
         await notion.pages.create({
           parent: { database_id: databaseId },
           properties: {
-            // Assumes the Notion DB has columns with these exact names.
-            'Name': { title: [{ text: { content: name } }] },
-            'Owner': { rich_text: [{ text: { content: owner.tag } }] },
-            'Due Date': { date: { start: dueDate } },
-            'Status': { select: { name: 'Pending' } },
+            [NOTION_NAME_COLUMN]: { title: [{ text: { content: name } }] },
+            [NOTION_OWNER_COLUMN]: { rich_text: [{ text: { content: owner.tag } }] },
+            [NOTION_DUEDATE_COLUMN]: { date: { start: dueDate } },
+            [NOTION_STATUS_COLUMN]: { select: { name: NOTION_STATUS_PENDING } },
           },
         });
 
@@ -85,10 +103,10 @@ module.exports = {
 
         submissions.forEach((page: any) => {
           const props = page.properties;
-          const name = props.Name?.title[0]?.text?.content || 'No Name';
-          const owner = props.Owner?.rich_text[0]?.text?.content || 'N/A';
-          const dueDate = props['Due Date']?.date?.start || 'N/A';
-          const status = props.Status?.select?.name || 'N/A';
+          const name = props[NOTION_NAME_COLUMN]?.title[0]?.text?.content || 'No Name';
+          const owner = props[NOTION_OWNER_COLUMN]?.rich_text[0]?.text?.content || 'N/A';
+          const dueDate = props[NOTION_DUEDATE_COLUMN]?.date?.start || 'N/A';
+          const status = props[NOTION_STATUS_COLUMN]?.select?.name || 'N/A';
 
           embed.addFields({
             name: `${name} (Status: ${status})`,

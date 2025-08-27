@@ -27,8 +27,14 @@ export async function getCalendarEvents(calendarId: string) {
 
     return { events: res.data.items || [] };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Google Calendar API Error:', error);
-    return { error: 'Could not retrieve schedule from Google Calendar.' };
+    let errorMessage = 'Googleカレンダーから予定を取得できませんでした。';
+    if (error.response?.data?.error?.message) {
+      errorMessage += ` 理由: ${error.response.data.error.message}`;
+    } else if (error.message) {
+      errorMessage += ` 理由: ${error.message}`;
+    }
+    return { error: errorMessage };
   }
 }

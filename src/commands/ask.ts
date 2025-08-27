@@ -1,9 +1,24 @@
 import { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits } from 'discord.js';
 import { PrismaClient } from '@prisma/client';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import * as kuromoji from 'kuromoji';
 
 const prisma = new PrismaClient();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
+// --- Kuromoji Tokenizer Initialization ---
+let tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures> | null = null;
+console.log('Building Kuromoji tokenizer...');
+kuromoji.builder({ dicPath: 'node_modules/kuromoji/dict' }).build((err, t) => {
+    if (err) {
+        console.error('FATAL: Failed to build kuromoji tokenizer. The /ask command will not work.', err);
+    } else {
+        tokenizer = t;
+        console.log('Kuromoji tokenizer built successfully.');
+    }
+});
+// --- End Kuromoji Initialization ---
+
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -50,15 +65,32 @@ module.exports = {
         await interaction.deferReply();
         const query = interaction.options.getString('query', true);
 
-        // Simple search for context. A real app might use more complex keyword extraction.
-        const queryKeywords = query.split(' ').slice(0, 5); // Use first 5 words as keywords
+        if (!tokenizer) {
+            return interaction.editReply('The AI is still warming up (the tokenizer is not ready). Please try again in a moment.');
+        }
+
+        // Use Kuromoji to extract meaningful keywords (nouns, verbs)
+        const tokens = tokenizer.tokenize(query);
+        const queryKeywords = tokens
+            .filter(token => token.pos === '名詞' || token.pos === '動詞')
+            .map(token => token.surface_form);
+
+        if (queryKeywords.length === 0) {
+            queryKeywords.push(query); // Fallback to using the whole query
+        }
+
         const contextRecords = await prisma.knowledge.findMany({
             where: {
-                OR: queryKeywords.map(kw => ({ content: { contains: kw, mode: 'insensitive' } }))
+                OR: queryKeywords.map(kw => ({
+                    OR: [
+                        { keyword: { contains: kw, mode: 'insensitive' } },
+                        { content: { contains: kw, mode: 'insensitive' } },
+                    ]
+                }))
             }
         });
 
-        const context = contextRecords.map(r => r.content).join('\n---\n');
+        const context = contextRecords.map(r => `Keyword: ${r.keyword}\nContent: ${r.content}`).join('\n---\n');
 
         const model = genAI.getGenerativeModel({ model: "gemini-pro"});
         const prompt = `Based on the following context, please answer the user's question. If the context is not relevant, use your general knowledge.\n\nCONTEXT:\n${context || 'No relevant context found.'}\n\nQUESTION:\n${query}`;
