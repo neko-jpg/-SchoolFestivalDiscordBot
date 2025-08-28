@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import getPrisma from '../prisma';
+import { ensureUser } from '../lib/user';
 import { requireGuildId } from '../lib/context';
 import { parseTimeRange } from '../lib/time';
 
@@ -96,11 +97,7 @@ module.exports = {
         }
 
         // Ensure the user exists in our database before connecting
-        await prisma.user.upsert({
-          where: { id: userToAssign.id },
-          update: { tag: userToAssign.tag },
-          create: { id: userToAssign.id, tag: userToAssign.tag },
-        });
+        await ensureUser(prisma as any, userToAssign.id, userToAssign.tag);
 
         // Connect the user to the shift
         await prisma.shiftMember.create({

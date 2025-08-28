@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, PermissionFlagsBits, AttachmentBuilder } from 'discord.js';
 import getPrisma from '../prisma';
+import { ensureUser } from '../lib/user';
 import logger from '../logger';
 import sharp from 'sharp';
 import path from 'path';
@@ -66,6 +67,9 @@ module.exports = {
       if (subcommand === 'report') {
         const location = interaction.options.getString('location', true) as LocationName;
         const level = interaction.options.getInteger('level', true);
+
+        // 報告者のユーザーを先に登録（FKがあるDBでも安全）
+        await ensureUser(prisma as any, interaction.user.id, interaction.user.tag);
 
         await prisma.congestionReport.create({
           data: {

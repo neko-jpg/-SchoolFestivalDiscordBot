@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import getPrisma from '../prisma';
+import { ensureUsers } from '../lib/user';
 import logger from '../logger';
 import { requireGuildId } from '../lib/context';
 
@@ -37,6 +38,12 @@ module.exports = {
         }
 
         try {
+          // Ensure both sender and receiver exist in User table to avoid FK errors
+          await ensureUsers(prisma as any, [
+            { id: interaction.user.id, tag: interaction.user.tag },
+            { id: targetUser.id, tag: targetUser.tag },
+          ]);
+
           await prisma.kudos.create({
             data: {
               guildId: gid,

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import getPrisma from '../prisma';
+import { ensureUser } from '../lib/user';
 import { requireGuildId } from '../lib/context';
 
 module.exports = {
@@ -39,6 +40,8 @@ module.exports = {
         const foundLocation = interaction.options.getString('location', true);
         const image = interaction.options.getAttachment('image');
 
+        // 報告者のユーザーを先に登録（FK違反の予防）
+        await ensureUser(prisma as any, interaction.user.id, interaction.user.tag);
         const newItem = await prisma.lostItem.create({
           data: {
             guildId: gid,
