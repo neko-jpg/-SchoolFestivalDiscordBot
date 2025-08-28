@@ -2,7 +2,8 @@
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 import { env } from './env';
-import path from 'path'; import fs from 'fs';
+import path from 'path';
+import fs from 'fs';
 import logger from './logger';
 
 const commands: any[] = [];
@@ -27,12 +28,26 @@ for (const file of fs
 }
 
 const rest = new REST({ version: '10' }).setToken(env.DISCORD_TOKEN);
+
+// Determine scope from env (guild | global). Defaults to guild.
+const rawScope = (process.env.COMMANDS_SCOPE || '').toLowerCase();
+const scope = rawScope === 'global' ? 'global' : 'guild';
+
 (async () => {
   try {
-    logger.info(`Uploading ${commands.length} commands to guild ${env.GUILD_ID}...`);
-    await rest.put(Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID), { body: commands });
-    logger.info('✅ Deploy done');
+    if (scope === 'global') {
+      logger.info(`Uploading ${commands.length} commands globally...`);
+      await rest.put(Routes.applicationCommands(env.CLIENT_ID), { body: commands });
+    } else {
+      logger.info(`Uploading ${commands.length} commands to guild ${env.GUILD_ID}...`);
+      await rest.put(
+        Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID),
+        { body: commands }
+      );
+    }
+    logger.info('Deploy done');
   } catch (err) {
-    logger.error({ err }, 'Deploy failed');
+    logger.error({ err, scope }, 'Deploy failed');
   }
 })();
+

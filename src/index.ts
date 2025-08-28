@@ -1,5 +1,5 @@
 // src/index.ts
-import { Client, GatewayIntentBits, Collection, Interaction } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, Interaction, Events } from 'discord.js';
 import fs from 'fs'; import path from 'path';
 import { env } from './env';
 import logger from './logger';
@@ -39,8 +39,8 @@ for (const file of fs
   }
 }
 
-client.once('ready', () => logger.info({ user: client.user?.tag }, 'Ready! Logged in'));
-client.on('interactionCreate', async (interaction: Interaction) => {
+client.once(Events.ClientReady, () => logger.info({ user: client.user?.tag }, 'Ready! Logged in'));
+client.on(Events.InteractionCreate, async (interaction: Interaction) => {
   if (interaction.isChatInputCommand()) {
     const cmd: Command | undefined = client.commands.get(interaction.commandName);
     if (!cmd) return;
