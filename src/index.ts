@@ -1,5 +1,6 @@
 // src/index.ts
 import { Client, GatewayIntentBits, Collection, Interaction, Events, EmbedBuilder } from 'discord.js';
+import http from 'http';
 import fs from 'fs'; import path from 'path';
 import { env } from './env';
 import { tryConnectPrisma } from './prisma';
@@ -22,6 +23,18 @@ client.commands = new Collection<string, Command>();
 
 const commandsPath = path.join(__dirname, 'commands');
 logger.info({ commandsPath }, 'コマンドディレクトリをスキャン中');
+
+// If running on a Web Service (Render/Heroku), bind a tiny HTTP health server to satisfy port scanners
+const port = process.env.PORT;
+if (port) {
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('ok');
+  });
+  server.listen(parseInt(port, 10), () => {
+    logger.info({ port }, 'Health server listening');
+  });
+}
 
 // --- DB到達性の簡易診断（起動時に一度だけ） ---
 try {
