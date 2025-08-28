@@ -100,12 +100,44 @@ model CongestionReport {
   id         String   @id @default(cuid())
   location   String
   level      Int
+  weight     Int      @default(1)
   reporterId String
   createdAt  DateTime @default(now())
   guildId    String
   User       User     @relation(fields: [reporterId], references: [id], onDelete: SetNull)
 
   @@index([guildId, location, createdAt])
+}
+
+// ギルドごとの混雑マップ（画像と地点の定義）
+model CongestionMap {
+  id             String               @id @default(cuid())
+  guildId        String
+  name           String
+  imageMessageId String
+  imageUrl       String
+  width          Int?
+  height         Int?
+  isActive       Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  locations      CongestionLocation[]
+
+  @@unique([guildId, name])
+  @@index([guildId, isActive])
+}
+
+// マップ上の地点（%座標）
+model CongestionLocation {
+  id        String         @id @default(cuid())
+  mapId     String
+  name      String
+  xPercent  Float
+  yPercent  Float
+  maxCapacity Int?
+  createdAt DateTime       @default(now())
+  map       CongestionMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  @@unique([mapId, name], name: "mapId_name")
 }
 
 model Template {

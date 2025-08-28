@@ -1,86 +1,43 @@
 {
   "version": "1",
-  "name": "æ¨™æº–ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆ",
+  "name": "•W€ƒeƒ“ƒvƒŒ[ƒg",
   "roles": [
-    {
-      "name": "å®Ÿè¡Œå§”å“¡",
-      "color": "#3498DB",
-      "hoist": true,
-      "mentionable": true
-    },
-    {
-      "name": "1å¹´ç”Ÿ",
-      "color": "#2ECC71"
-    },
-    {
-      "name": "2å¹´ç”Ÿ",
-      "color": "#F1C40F"
-    },
-    {
-      "name": "3å¹´ç”Ÿ",
-      "color": "#E74C3C"
-    }
+    { "name": "ÀsˆÏˆõ", "color": "#3498DB", "hoist": true, "mentionable": true },
+    { "name": "1”N¶", "color": "#2ECC71" },
+    { "name": "2”N¶", "color": "#1ABC9C" },
+    { "name": "3”N¶", "color": "#9B59B6" },
+    { "name": "4”N¶", "color": "#F39C12" }
   ],
   "categories": [
     {
-      "name": "é‹å–¶æœ¬éƒ¨",
+      "name": "‰^‰c–{•”",
       "channels": [
+        { "name": "‘S‘Ì˜A—", "type": "text", "topic": "ÀsˆÏˆõŒü‚¯‚Ì‘S‘Ì˜A—ƒ`ƒƒƒ“ƒlƒ‹‚Å‚·B" },
         {
-          "name": "å…¨ä½“é€£çµ¡",
+          "name": "ƒAƒiƒEƒ“ƒX",
           "type": "text",
-          "topic": "å®Ÿè¡Œå§”å“¡å‘ã‘ã®å…¨ä½“é€£çµ¡ãƒãƒ£ãƒ³ãƒãƒ«ã§ã™ã€‚"
-        },
-        {
-          "name": "ã‚¢ãƒŠã‚¦ãƒ³ã‚¹",
-          "type": "text",
-          "topic": "Botã«ã‚ˆã‚‹è‡ªå‹•é€šçŸ¥ã‚„é‡è¦å‘ŠçŸ¥ãŒæŠ•ç¨¿ã•ã‚Œã¾ã™ã€‚",
+          "topic": "Bot‚É‚æ‚é©“®’Ê’m‚âd—v’m‚ª“Še‚³‚ê‚Ü‚·B",
           "overwrites": [
-            {
-              "role": "@everyone",
-              "deny": ["SendMessages"],
-              "allow": ["ViewChannel", "ReadMessageHistory"]
-            },
-            {
-              "role": "å®Ÿè¡Œå§”å“¡",
-              "allow": ["SendMessages"]
-            }
+            { "role": "@everyone", "deny": ["SendMessages"], "allow": ["ViewChannel", "ReadMessageHistory"] },
+            { "role": "ÀsˆÏˆõ", "allow": ["SendMessages"] }
           ]
         },
-        {
-          "name": "è­°äº‹éŒ²",
-          "type": "text",
-          "topic": "AIã«ã‚ˆã‚‹è­°äº‹éŒ²ã®è¦ç´„ãŒè‡ªå‹•æŠ•ç¨¿ã•ã‚Œã¾ã™ã€‚"
-        },
-        {
-          "name": "ä¼šè­°å®¤",
-          "type": "voice",
-          "bitrate": 64000
-        }
+        { "name": "‰ï‹cº", "type": "voice", "bitrate": 64000 }
       ]
     },
     {
-      "name": "å„ä¿‚é€£çµ¡",
+      "name": "Šw”N",
       "channels": [
-        {
-          "name": "ä¼ç”»ä¿‚",
-          "type": "text",
-          "topic": "ä¼ç”»ä¿‚ã®é€£çµ¡ãƒ»ç›¸è«‡ç”¨ãƒãƒ£ãƒ³ãƒãƒ«ã§ã™ã€‚"
-        },
-        {
-          "name": "åºƒå ±ä¿‚",
-          "type": "text",
-          "topic": "åºƒå ±ä¿‚ã®é€£çµ¡ãƒ»ç›¸è«‡ç”¨ãƒãƒ£ãƒ³ãƒãƒ«ã§ã™ã€‚"
-        },
-        {
-          "name": "ä¼šè¨ˆä¿‚",
-          "type": "text",
-          "topic": "ä¼šè¨ˆä¿‚ã®é€£çµ¡ãƒ»ç›¸è«‡ç”¨ãƒãƒ£ãƒ³ãƒãƒ«ã§ã™ã€‚"
-        },
-        {
-          "name": "è³‡æãƒ»è­¦å‚™ä¿‚",
-          "type": "text",
-          "topic": "è³‡æä¿‚ã¨è­¦å‚™ä¿‚ã®é€£çµ¡ãƒ»ç›¸è«‡ç”¨ãƒãƒ£ãƒ³ãƒãƒ«ã§ã™ã€‚"
-        }
+        { "name": "1”N", "type": "text", "overwrites": [ { "role": "1”N¶", "allow": ["ViewChannel"] }, { "role": "@everyone", "deny": ["ViewChannel"] } ] },
+        { "name": "2”N", "type": "text", "overwrites": [ { "role": "2”N¶", "allow": ["ViewChannel"] }, { "role": "@everyone", "deny": ["ViewChannel"] } ] },
+        { "name": "3”N", "type": "text", "overwrites": [ { "role": "3”N¶", "allow": ["ViewChannel"] }, { "role": "@everyone", "deny": ["ViewChannel"] } ] },
+        { "name": "4”N", "type": "text", "overwrites": [ { "role": "4”N¶", "allow": ["ViewChannel"] }, { "role": "@everyone", "deny": ["ViewChannel"] } ] }
+      ]
+    },
+    {
+      "name": "ƒ[ƒ‹‘I‘ğ",
+      "channels": [
+        { "name": "Šw”N‘I‘ğ", "type": "text", "topic": "‚±‚±‚ÅŠw”Nƒ[ƒ‹‚ğ‘I‘ğ‚µ‚Ä‚­‚¾‚³‚¢B/role post-picker ‚Åƒƒjƒ…[‚ğo‚µ‚Ü‚·B" }
       ]
     }
   ]

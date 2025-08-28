@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import getPrisma from '../prisma';
 import { ensureUser } from '../lib/user';
 import { requireGuildId } from '../lib/context';
@@ -8,6 +8,14 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('shift')
     .setDescription('当番シフトを管理（DB使用）')
+    .addSubcommand(sc => sc
+      .setName('panel')
+      .setDescription('DB不要の参加パネルを作成')
+      .addStringOption(o => o.setName('name').setDescription('名称').setRequired(true))
+      .addStringOption(o => o.setName('time').setDescription('10:00-12:00 形式').setRequired(true))
+      .addStringOption(o => o.setName('location').setDescription('場所'))
+      .addIntegerOption(o => o.setName('max').setDescription('最大人数').setMinValue(1))
+    )
     .addSubcommand(subcommand =>
       subcommand
         .setName('create')
@@ -36,6 +44,23 @@ module.exports = {
     const gid = requireGuildId(interaction.guildId);
 
     try {
+      if (subcommand === 'panel') {
+        const name = interaction.options.getString('name', true);
+        const time = interaction.options.getString('time', true);
+        const location = interaction.options.getString('location') ?? '';
+        const max = interaction.options.getInteger('max') ?? 0;
+        const header = max ? `**参加者 (0/${max})**` : `**参加者**`;
+        const embed = new EmbedBuilder()
+          .setTitle(`🧑‍💼 シフト参加：${name}`)
+          .setDescription(`時間: ${time}\n場所: ${location || '—'}\n\n${header}\n—`)
+          .setColor('#2ECC71');
+        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId('shift:join').setLabel('参加').setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId('shift:leave').setLabel('辞退').setStyle(ButtonStyle.Secondary)
+        );
+        await interaction.reply({ embeds: [embed], components: [row] });
+        return;
+      }
       if (subcommand === 'create') {
         const name = interaction.options.getString('name', true);
         const time = interaction.options.getString('time', true);

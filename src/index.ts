@@ -1,5 +1,5 @@
 // src/index.ts
-import { Client, GatewayIntentBits, Collection, Interaction, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, Interaction, Events, EmbedBuilder } from 'discord.js';
 import fs from 'fs'; import path from 'path';
 import { env } from './env';
 import { tryConnectPrisma } from './prisma';
@@ -276,6 +276,61 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
   } else if (interaction.isAutocomplete()) {
     const cmd: Command | undefined = client.commands.get(interaction.commandName);
     if (cmd?.autocomplete) try { await cmd.autocomplete(interaction); } catch (e) { logger.error({ e }, 'Autocomplete failed'); }
+  }
+});
+
+// 追加: ボタン/セレクトメニューのハンドラ（DBレスのシフト参加, 学年ロール付与）
+client.on(Events.InteractionCreate, async (raw: Interaction) => {
+  const interaction: any = raw as any;
+  try {
+    if (interaction.isButton && interaction.isButton()) {
+      if (interaction.customId === 'shift:join' || interaction.customId === 'shift:leave') {
+        const msg: any = await interaction.message.fetch();
+        const embed: any = msg.embeds[0];
+        const desc: string = embed?.description ?? '';
+        const lines = desc.split('\n');
+        const idx = lines.findIndex((l: string) => l.startsWith('**参加者'));
+        if (idx === -1) { await interaction.reply({ content: 'このメッセージは参加パネルではありません。', ephemeral: true }); return; }
+        const header = lines.slice(0, idx + 1);
+        const list = lines.slice(idx + 1).filter((l: string) => l.trim() !== '—');
+        const tag = interaction.user.tag;
+        if (interaction.customId === 'shift:join') {
+          if (!list.includes(tag)) list.push(tag);
+        } else {
+          const pos = list.indexOf(tag); if (pos >= 0) list.splice(pos, 1);
+        }
+        const headerLine = header[idx];
+        const m = headerLine.match(/\((\d+)(?:\/(\d+))?\)/);
+        const max = m?.[2] ? parseInt(m[2], 10) : 0;
+        if (interaction.customId === 'shift:join' && max && list.length > max) {
+          await interaction.reply({ content: `定員(${max})に達しています。`, ephemeral: true });
+          return;
+        }
+        const body = list.length ? list.join('\n') : '—';
+        const newDesc = [...header, body].join('\n');
+        const newEmbed = (EmbedBuilder as any).from(embed).setDescription(newDesc);
+        await msg.edit({ embeds: [newEmbed] });
+        await interaction.reply({ content: '更新しました。', ephemeral: true });
+      }
+    } else if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
+      if (interaction.customId === 'grade-select') {
+        const map: Record<string, string> = { 'grade-1': '1年生', 'grade-2': '2年生', 'grade-3': '3年生', 'grade-4': '4年生' };
+        const selected = interaction.values[0];
+        const name = map[selected];
+        if (!name) { await interaction.reply({ content: '選択が不正です。', ephemeral: true }); return; }
+        const guild = interaction.guild!; await guild.roles.fetch();
+        const role = guild.roles.cache.find((r: any) => r.name === name);
+        if (!role) { await interaction.reply({ content: `ロール「${name}」が見つかりません。/build で作成してください。`, ephemeral: true }); return; }
+        const m = await guild.members.fetch(interaction.user.id);
+        const all = ['1年生','2年生','3年生','4年生'];
+        const toRemove = m.roles.cache.filter((r: any) => all.includes(r.name) && r.id !== role.id);
+        await m.roles.remove([...toRemove.keys()]);
+        await m.roles.add(role);
+        await interaction.reply({ content: `「${name}」ロールを付与しました。`, ephemeral: true });
+      }
+    }
+  } catch (e) {
+    logger.error({ e }, 'UI interaction handler failed');
   }
 });
 

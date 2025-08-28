@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, CommandInteraction, Role, GuildMember, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder, AutocompleteInteraction, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommandBuilder, CommandInteraction, Role, GuildMember, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder, AutocompleteInteraction, ChatInputCommandInteraction, StringSelectMenuBuilder } from 'discord.js';
 import { filterMembers } from '../services/filterService';
 import getPrisma from '../prisma';
 import PQueue from 'p-queue';
@@ -8,6 +8,9 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('role')
     .setDescription('Commands for managing roles.')
+    .addSubcommand(sc =>
+      sc.setName('post-picker').setDescription('学年ロールのセレクトメニューを投稿')
+    )
     .addSubcommand(subcommand =>
       subcommand
         .setName('assign-bulk')
@@ -70,6 +73,21 @@ module.exports = {
     const prisma = getPrisma();
     const gid = requireGuildId(interaction.guildId);
     const group = interaction.options.getSubcommandGroup();
+    if (!group && interaction.options.getSubcommand() === 'post-picker') {
+      const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('grade-select')
+          .setPlaceholder('学年を選択…')
+          .addOptions(
+            { label: '1年生', value: 'grade-1' },
+            { label: '2年生', value: 'grade-2' },
+            { label: '3年生', value: 'grade-3' },
+            { label: '4年生', value: 'grade-4' },
+          )
+      );
+      await interaction.reply({ content: '学年ロールの選択メニューを投稿しました。', components: [row] });
+      return;
+    }
 
     if (group === 'segment') {
         const subcommand = interaction.options.getSubcommand();
