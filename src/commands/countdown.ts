@@ -14,12 +14,21 @@ module.exports = {
     }
 
     const prisma = getPrisma();
-    const config = await prisma.guildConfig.findUnique({
-        where: { guildId: interaction.guildId },
-    });
+    let config: { festivalStartDate: Date | null } | null = null;
+    try {
+      config = await prisma.guildConfig.findUnique({
+          where: { guildId: interaction.guildId },
+          select: { festivalStartDate: true }
+      });
+    } catch (e: any) {
+      // Graceful fallback when DB is unreachable; use ENV if present
+      // Logged at warn level to aid diagnosis without breaking UX
+      console.warn('[countdown] Failed to read DB config, falling back to ENV:', e?.message || e);
+      config = null;
+    }
 
     const festivalDateFromEnv = env.FESTIVAL_START_DATE;
-    const festivalDateFromDb = config?.festivalStartDate;
+    const festivalDateFromDb = config?.festivalStartDate ?? undefined;
 
     if (!festivalDateFromDb && !festivalDateFromEnv) {
       await interaction.reply({ content: '文化祭の開始日が設定されていません。`/config startdate`で設定してください。', ephemeral: true });

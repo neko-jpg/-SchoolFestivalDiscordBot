@@ -3,7 +3,27 @@ import { PermissionFlagsBits } from 'discord.js';
 
 // Dynamically create a Zod enum from the keys of PermissionFlagsBits
 const permissionNames = Object.keys(PermissionFlagsBits) as (keyof typeof PermissionFlagsBits)[];
-const PermissionStringSchema = z.enum(permissionNames);
+
+// Legacy (snake_case UPPER) -> v14 PascalCase mapping for common permissions
+const legacyMap: Record<string, keyof typeof PermissionFlagsBits> = {
+  SEND_MESSAGES: 'SendMessages',
+  VIEW_CHANNEL: 'ViewChannel',
+  READ_MESSAGE_HISTORY: 'ReadMessageHistory',
+  // Add as needed:
+  // MANAGE_EMOJIS: 'ManageEmojisAndStickers',
+  // USE_APPLICATION_COMMANDS: 'UseApplicationCommands',
+  // MANAGE_ROLES: 'ManageRoles',
+  // MANAGE_CHANNELS: 'ManageChannels',
+};
+
+// Accept both legacy and modern names; normalize before validating
+const PermissionStringSchema = z.preprocess((v) => {
+  if (typeof v === 'string') {
+    const upper = v.toUpperCase();
+    if (legacyMap[upper]) return legacyMap[upper];
+  }
+  return v;
+}, z.enum(permissionNames));
 
 const hexColorRegex = /^#?[0-9a-fA-F]{6}$/;
 

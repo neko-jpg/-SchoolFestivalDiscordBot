@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { config } from 'dotenv';
 
-// Load .env file at the top of the application
-config();
+// Load .env file at the top of the application.
+// Use override:true so local .env wins over machine-level env vars
+// (avoids picking up stale DATABASE_URL etc.)
+config({ override: true });
 
 // Prefer DISCORD_* names but accept legacy aliases without breaking existing setups
 const mergedEnv = {

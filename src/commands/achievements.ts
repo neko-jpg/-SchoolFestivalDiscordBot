@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import getPrisma from '../prisma';
+import logger from '../logger';
 import { requireGuildId } from '../lib/context';
 
 module.exports = {
@@ -25,14 +26,21 @@ module.exports = {
 
         const prisma = getPrisma();
         const gid = requireGuildId(interaction.guildId);
-        const [kudosGiven, kudosReceived, itemsReported, shiftCount] = await Promise.all([
-          prisma.kudos.count({ where: { guildId: gid, fromUserId: targetUser.id } }),
-          prisma.kudos.count({ where: { guildId: gid, toUserId: targetUser.id } }),
-          prisma.lostItem.count({ where: { guildId: gid, reportedById: targetUser.id } }),
-          prisma.shiftMember.count({
-            where: { userId: targetUser.id, shift: { guildId: gid } },
-          }),
-        ]);
+        let kudosGiven = 0, kudosReceived = 0, itemsReported = 0, shiftCount = 0;
+        try {
+          [kudosGiven, kudosReceived, itemsReported, shiftCount] = await Promise.all([
+            prisma.kudos.count({ where: { guildId: gid, fromUserId: targetUser.id } }),
+            prisma.kudos.count({ where: { guildId: gid, toUserId: targetUser.id } }),
+            prisma.lostItem.count({ where: { guildId: gid, reportedById: targetUser.id } }),
+            prisma.shiftMember.count({
+              where: { userId: targetUser.id, shift: { guildId: gid } },
+            }),
+          ]);
+        } catch (e: any) {
+          logger.warn({ err: e }, 'Achievements counts unavailable (DB error)');
+          await interaction.editReply({ content: '⚠️ 現在DBに接続できないため、実績を取得できません。' });
+          return;
+        }
 
         const embed = new EmbedBuilder()
           .setColor('#FFD700')

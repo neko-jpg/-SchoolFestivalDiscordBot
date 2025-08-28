@@ -1,5 +1,6 @@
 import { ChannelType, Guild, OverwriteResolvable, PermissionsString } from 'discord.js';
 import getPrisma from '../prisma';
+import { withTimeout } from '../utils';
 import logger from '../logger';
 import { TemplateRoleOverwrite } from '../types/template';
 import { DiffResult } from './diffService';
@@ -37,16 +38,26 @@ async function mapOverwrites(guild: Guild, templateOverwrites: TemplateRoleOverw
  */
 export async function executeBuild(guild: Guild, diff: DiffResult, currentState: GuildState, templateName: string, userId: string) {
     const prisma = getPrisma();
-    const buildRun = await prisma.buildRun.create({
-        data: {
+    let buildRun: { id: string } | null = null;
+    try {
+      buildRun = await withTimeout(
+        prisma.buildRun.create({
+          data: {
             guildId: guild.id,
             templateName,
             executedBy: userId,
             status: 'PENDING',
             snapshot: currentState as any,
             dryRunResult: diff as any,
-        },
-    });
+          },
+        }),
+        5000,
+        undefined,
+        'buildRun.create'
+      );
+    } catch (e: any) {
+      logger.warn({ err: e }, 'DB unavailable: proceeding with build without persistence');
+    }
 
     const failures: string[] = [];
 
@@ -145,10 +156,18 @@ export async function executeBuild(guild: Guild, diff: DiffResult, currentState:
         }
     }
 
-    await prisma.buildRun.update({
-        where: { id: buildRun.id },
-        data: { status: 'SUCCESS' },
-    });
+    if (buildRun?.id) {
+      try {
+        await withTimeout(
+          prisma.buildRun.update({ where: { id: buildRun.id }, data: { status: 'SUCCESS' } }),
+          5000,
+          undefined,
+          'buildRun.update'
+        );
+      } catch (e: any) {
+        logger.warn({ err: e }, 'DB unavailable when marking build success');
+      }
+    }
 
     return { buildRun, failures };
 }

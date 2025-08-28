@@ -1,5 +1,6 @@
 import { Guild, OverwriteResolvable, PermissionsString } from 'discord.js';
 import getPrisma from '../prisma';
+import logger from '../logger';
 import { DiffResult } from './diffService';
 import { SimpleOverwrite } from './discordService';
 
@@ -30,7 +31,13 @@ async function mapOverwritesFromSnapshot(guild: Guild, snapshotOverwrites: Simpl
  */
 export async function executeRollback(buildRunId: string, guild: Guild) {
     const prisma = getPrisma();
-    const buildRun = await prisma.buildRun.findUnique({ where: { id: buildRunId } });
+    let buildRun: any = null;
+    try {
+        buildRun = await prisma.buildRun.findUnique({ where: { id: buildRunId } });
+    } catch (e: any) {
+        logger.error({ err: e, buildRunId }, 'Failed to load BuildRun for rollback (DB unavailable)');
+        throw new Error('DBに接続できないため、ロールバック情報を取得できません。');
+    }
 
     if (!buildRun) throw new Error('Build run not found.');
     if (buildRun.status === 'ROLLED_BACK') throw new Error('This build has already been rolled back.');
@@ -78,8 +85,12 @@ export async function executeRollback(buildRunId: string, guild: Guild) {
         }
     }
 
-    await prisma.buildRun.update({
-        where: { id: buildRunId },
-        data: { status: 'ROLLED_BACK' },
-    });
+    try {
+        await prisma.buildRun.update({
+            where: { id: buildRunId },
+            data: { status: 'ROLLED_BACK' },
+        });
+    } catch (e: any) {
+        logger.warn({ err: e, buildRunId }, 'Failed to mark build as ROLLED_BACK (DB unavailable)');
+    }
 }

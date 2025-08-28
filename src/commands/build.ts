@@ -144,12 +144,15 @@ module.exports = {
 
                         const { buildRun, failures } = await executeBuild(i.guild, diff, currentState, templateName, i.user.id);
 
-                        const undoButton = new ButtonBuilder()
-                            .setCustomId(`build-undo-${buildRun.id}`)
-                            .setLabel('Undo')
-                            .setStyle(ButtonStyle.Danger);
-
-                        const resultRow = new ActionRowBuilder<ButtonBuilder>().addComponents(undoButton);
+                        let componentsRows: ActionRowBuilder<ButtonBuilder>[] = [];
+                        if (buildRun?.id) {
+                            const undoButton = new ButtonBuilder()
+                                .setCustomId(`build-undo-${buildRun.id}`)
+                                .setLabel('Undo')
+                                .setStyle(ButtonStyle.Danger);
+                            const resultRow = new ActionRowBuilder<ButtonBuilder>().addComponents(undoButton);
+                            componentsRows = [resultRow];
+                        }
 
                         let finalMessage = `✅ **Build Successful!**\nThe template has been applied.`;
                         if (failures.length > 0) {
@@ -160,7 +163,10 @@ module.exports = {
                             finalMessage = `⚠️ **Build Finished with ${failures.length} errors.**\n\n**Errors:**\n- ${failureMessage}`;
                         }
 
-                        await i.editReply({ content: finalMessage, components: [resultRow] });
+                        if (!buildRun?.id) {
+                            finalMessage += '\n\n(ℹ️ DBが利用できないためUNDOは無効です)';
+                        }
+                        await i.editReply({ content: finalMessage, components: componentsRows });
 
                     } catch (error: any) {
                         logger.fatal({ err: error, user: i.user.id }, "Catastrophic error during build execution");

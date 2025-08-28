@@ -36,7 +36,9 @@ export async function loadAndValidateTemplate(filePath: string): Promise<ServerT
         const issues: ZodIssue[] = (validationResult.error as ZodError).issues ?? [];
         const errorMessages = issues.map((issue) => {
             const path = (issue.path?.join?.('.') ?? '.') as string;
-            return ` - at path \`${path}\`: ${issue.message}`;
+            const received = (issue as any).received;
+            const receivedInfo = received !== undefined ? ` (received: ${JSON.stringify(received)})` : '';
+            return ` - at path \`${path}\`: ${issue.message}${receivedInfo}`;
         });
         throw new TemplateValidationError(`Template validation failed:\n${errorMessages.join('\n')}`);
     }

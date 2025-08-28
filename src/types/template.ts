@@ -5,7 +5,7 @@
 
 export interface TemplateRoleOverwrite {
   role: string; // Role name, e.g., "@everyone" or "実行委員"
-  allow: string[]; // Array of permission flags, e.g., "SEND_MESSAGES"
+  allow: string[]; // Array of permission flags, e.g., "SendMessages"
   deny: string[];
 }
 

@@ -91,17 +91,23 @@ module.exports = {
             queryKeywords.push(query); // Fallback to using the whole query
         }
 
-        const contextRecords = await prisma.knowledge.findMany({
-            where: {
-                guildId: gid,
-                OR: queryKeywords.map(kw => ({
-                    OR: [
-                        { keyword: { contains: kw, mode: 'insensitive' } },
-                        { content: { contains: kw, mode: 'insensitive' } },
-                    ]
-                }))
-            }
-        });
+        let contextRecords: { keyword: string; content: string }[] = [];
+        try {
+          contextRecords = await prisma.knowledge.findMany({
+              where: {
+                  guildId: gid,
+                  OR: queryKeywords.map(kw => ({
+                      OR: [
+                          { keyword: { contains: kw, mode: 'insensitive' } },
+                          { content: { contains: kw, mode: 'insensitive' } },
+                      ]
+                  }))
+              }
+          });
+        } catch (e: any) {
+          logger.warn({ err: e }, 'Knowledge lookup failed; proceeding without DB context');
+          contextRecords = [];
+        }
 
         const context = contextRecords.map(r => `Keyword: ${r.keyword}\nContent: ${r.content}`).join('\n---\n');
 

@@ -10,6 +10,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+
+
 model User {
   id           String       @id // Discord User ID
   tag          String?

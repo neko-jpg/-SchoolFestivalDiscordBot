@@ -40,12 +40,16 @@ module.exports = {
       switch (subcommand) {
         case 'reminder': {
           const channel = interaction.options.getChannel('channel', true);
-          await prisma.guildConfig.upsert({
-            where: { guildId },
-            update: { reminderChannelId: channel.id },
-            create: { guildId, reminderChannelId: channel.id },
-          });
-          await interaction.reply({ content: `✅ リマインダーチャンネルを <#${channel.id}> に設定しました。`, ephemeral: true });
+          try {
+            await prisma.guildConfig.upsert({
+              where: { guildId },
+              update: { reminderChannelId: channel.id },
+              create: { guildId, reminderChannelId: channel.id },
+            });
+            await interaction.reply({ content: `✅ リマインダーチャンネルを <#${channel.id}> に設定しました。`, ephemeral: true });
+          } catch (e: any) {
+            await interaction.reply({ content: `⚠️ DBに接続できないため設定を保存できませんでした。ネットワークとDATABASE_URLをご確認ください。`, ephemeral: true });
+          }
           break;
         }
         case 'startdate': {
@@ -57,12 +61,16 @@ module.exports = {
             }
             const [year, month, day] = dateStr.split('-').map(Number);
             const startDate = new Date(year, month - 1, day); // 月は0-indexed
-            await prisma.guildConfig.upsert({
-              where: { guildId },
-              update: { festivalStartDate: startDate },
-              create: { guildId, festivalStartDate: startDate },
-            });
-            await interaction.reply({ content: `✅ 文化祭開始日を ${dateStr} に設定しました。`, ephemeral: true });
+            try {
+              await prisma.guildConfig.upsert({
+                where: { guildId },
+                update: { festivalStartDate: startDate },
+                create: { guildId, festivalStartDate: startDate },
+              });
+              await interaction.reply({ content: `✅ 文化祭開始日を ${dateStr} に設定しました。`, ephemeral: true });
+            } catch (e: any) {
+              await interaction.reply({ content: `⚠️ DBに接続できないため開始日を保存できませんでした。`, ephemeral: true });
+            }
             break;
         }
       }

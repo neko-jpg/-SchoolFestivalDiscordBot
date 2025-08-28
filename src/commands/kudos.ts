@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
 import getPrisma from '../prisma';
+import logger from '../logger';
 import { requireGuildId } from '../lib/context';
 
 module.exports = {
@@ -35,14 +36,20 @@ module.exports = {
           return;
         }
 
-        await prisma.kudos.create({
-          data: {
-            guildId: gid,
-            fromUserId: interaction.user.id,
-            toUserId: targetUser.id,
-            message,
-          },
-        });
+        try {
+          await prisma.kudos.create({
+            data: {
+              guildId: gid,
+              fromUserId: interaction.user.id,
+              toUserId: targetUser.id,
+              message,
+            },
+          });
+        } catch (e: any) {
+          logger.warn({ err: e }, 'Failed to create kudos (DB unavailable)');
+          await interaction.reply({ content: '⚠️ 現在DBに接続できないため、kudosを保存できませんでした。', ephemeral: true });
+          return;
+        }
 
         const embed = new EmbedBuilder()
           .setColor('#FEE75C')
@@ -54,19 +61,26 @@ module.exports = {
 
         await interaction.reply({ embeds: [embed] });
       } else if (subcommand === 'top') {
-        const topReceivers = await prisma.kudos.groupBy({
-          by: ['toUserId'],
-          where: { guildId: gid },
-          _count: {
-            toUserId: true,
-          },
-          orderBy: {
+        let topReceivers: any[] = [];
+        try {
+          topReceivers = await (prisma.kudos as any).groupBy({
+            by: ['toUserId'],
+            where: { guildId: gid },
             _count: {
-              toUserId: 'desc',
+              toUserId: true,
             },
-          },
-          take: 5,
-        });
+            orderBy: {
+              _count: {
+                toUserId: 'desc',
+              },
+            },
+            take: 5,
+          } as any);
+        } catch (e: any) {
+          logger.warn({ err: e }, 'Failed to fetch kudos leaderboard (DB unavailable)');
+          await interaction.reply({ content: '⚠️ 現在Kudosランキングを取得できません（DB接続エラー）。', ephemeral: true });
+          return;
+        }
 
         if (topReceivers.length === 0) {
           await interaction.reply('No kudos have been given yet.');
