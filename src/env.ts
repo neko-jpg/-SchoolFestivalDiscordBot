@@ -81,6 +81,13 @@ const envSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'FESTIVAL_START_DATE must be in YYYY-MM-DD format.')
     .optional(),
+  // DB connection tuning
+  DB_CONNECT_MAX_RETRIES: z
+    .preprocess((v) => (typeof v === 'string' ? parseInt(v, 10) : v), z.number().int().min(0).default(5)),
+  DB_CONNECT_BASE_DELAY_MS: z
+    .preprocess((v) => (typeof v === 'string' ? parseInt(v, 10) : v), z.number().int().min(0).default(2000)),
+  DB_CONNECT_TIMEOUT_MS: z
+    .preprocess((v) => (typeof v === 'string' ? parseInt(v, 10) : v), z.number().int().min(1000).default(5000)),
 });
 
 // Parse and export the environment variables.

@@ -57,7 +57,7 @@ try {
 }
 
 (async () => {
-  const ok = await tryConnectPrisma(5000);
+  const ok = await tryConnectPrisma();
   if (!ok) logger.warn('DBへの接続に失敗しました（5秒でタイムアウト）。一部コマンドは機能制限されます。');
 })();
 
