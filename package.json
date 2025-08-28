@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "これは、文化祭ディスコードbot作成のためのレポジトリです",
   "main": "index.js",
+  "engines": { "node": ">=20" },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",

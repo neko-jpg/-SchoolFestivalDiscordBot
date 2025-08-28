@@ -31,7 +31,8 @@ if (port) {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('ok');
   });
-  server.listen(parseInt(port, 10), () => {
+  // Bind explicitly to 0.0.0.0 for Koyeb/containers
+  server.listen(parseInt(port, 10), '0.0.0.0', () => {
     logger.info({ port }, 'Health server listening');
   });
 }
