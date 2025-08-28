@@ -9,6 +9,7 @@
     "dev": "ts-node --transpile-only src/index.ts",
     "deploy": "ts-node src/deploy-commands.ts",
     "validate:template": "ts-node src/scripts/validate-template.ts",
+    "postinstall": "npm run build",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "typecheck": "tsc --noEmit",
