@@ -6,6 +6,7 @@ import { env } from './env';
 import { tryConnectPrisma } from './prisma';
 import logger from './logger';
 import { disconnectPrisma } from './prisma';
+import { executeRollback } from './services/rollbackService';
 
 type Command = { data: any; execute: (i: any)=>Promise<void>; autocomplete?: (i:any)=>Promise<void> };
 
@@ -325,6 +326,16 @@ client.on(Events.InteractionCreate, async (raw: Interaction) => {
         const newEmbed = (EmbedBuilder as any).from(embed).setDescription(newDesc);
         await msg.edit({ embeds: [newEmbed] });
         await interaction.reply({ content: '更新しました。', ephemeral: true });
+      } else if (interaction.customId && interaction.customId.startsWith('build-undo-')) {
+        const buildRunId = interaction.customId.substring('build-undo-'.length);
+        try {
+          await interaction.deferReply({ ephemeral: true });
+          await executeRollback(buildRunId, interaction.guild!);
+          await interaction.editReply('ロールバックが完了しました。');
+        } catch (e: any) {
+          const msg = (e?.code ? `[${e.code}] ` : '') + (e?.message ?? String(e));
+          await interaction.editReply(`ロールバックに失敗しました:\n\`\`\`\n${msg}\n\`\`\``);
+        }
       }
     } else if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
       if (interaction.customId === 'grade-select') {
