@@ -16,7 +16,7 @@ const mergedEnv = {
 };
 
 // Define the schema for environment variables
-const envSchema = z.object({
+const envSchemaCore = z.object({
   DISCORD_TOKEN: z
     .string()
     .min(1, 'DISCORD_TOKEN is required.'),
@@ -24,13 +24,15 @@ const envSchema = z.object({
     .string()
     .min(1, 'CLIENT_ID is required.')
     .regex(/^\d+$/, 'CLIENT_ID must be a valid Discord ID.'),
+  // Make GUILD_ID optional; we validate conditionally below based on COMMANDS_SCOPE
   GUILD_ID: z
     .string()
-    .min(1, 'GUILD_ID is required.')
-    .regex(/^\d+$/, 'GUILD_ID must be a valid Discord ID.'),
+    .regex(/^\d+$/, 'GUILD_ID must be a valid Discord ID.')
+    .optional(),
   COMMANDS_SCOPE: z
     .enum(['guild', 'global', 'both', 'clear-guild', 'clear-global'])
-    .default('guild'),
+    // Default to 'global' so hosting without a guild id does not crash
+    .default('global'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
@@ -88,6 +90,18 @@ const envSchema = z.object({
     .preprocess((v) => (typeof v === 'string' ? parseInt(v, 10) : v), z.number().int().min(0).default(2000)),
   DB_CONNECT_TIMEOUT_MS: z
     .preprocess((v) => (typeof v === 'string' ? parseInt(v, 10) : v), z.number().int().min(1000).default(5000)),
+});
+
+// Add cross-field validation: if scope includes guild, GUILD_ID must be present
+const envSchema = envSchemaCore.superRefine((val, ctx) => {
+  const needsGuild = val.COMMANDS_SCOPE === 'guild' || val.COMMANDS_SCOPE === 'both' || val.COMMANDS_SCOPE === 'clear-guild';
+  if (needsGuild && !val.GUILD_ID) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['GUILD_ID'],
+      message: 'GUILD_ID is required when COMMANDS_SCOPE is guild/both/clear-guild. Either set GUILD_ID or change COMMANDS_SCOPE to global.',
+    });
+  }
 });
 
 // Parse and export the environment variables.

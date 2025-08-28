@@ -70,6 +70,11 @@ for (const filePath of discovered) {
 
 const rest = new REST({ version: '10' }).setToken(env.DISCORD_TOKEN);
 
+function requireGuildId(): string {
+  if (!env.GUILD_ID) throw new Error('GUILD_ID is required for guild-scope command operations');
+  return env.GUILD_ID;
+}
+
 // Determine scope from env (guild | global). Defaults to guild.
 const scope: 'guild' | 'global' | 'both' | 'clear-guild' | 'clear-global' = env.COMMANDS_SCOPE as any;
 
@@ -132,7 +137,7 @@ async function preflightDiff(target: 'guild' | 'global') {
     logger.info({ scope: 'global', missingOnRemote, extraOnRemote, changed }, 'Preflight diff (GLOBAL)');
     return { missingOnRemote, extraOnRemote, changed };
   } else {
-    const remote = (await rest.get(Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID))) as any[];
+    const remote = (await rest.get(Routes.applicationGuildCommands(env.CLIENT_ID, requireGuildId()))) as any[];
     const remoteMap = new Map<string, any>();
     for (const r of remote) {
       const n = normalizeCommandShape(r);
@@ -165,8 +170,9 @@ async function verifyClientIdMatchesToken() {
 
 async function verifyGuildMembership() {
   try {
-    const g = (await rest.get(Routes.guild(env.GUILD_ID))) as any;
-    logger.info({ guildId: env.GUILD_ID, name: g?.name }, 'Verified bot is in target guild');
+    const gid = requireGuildId();
+    const g = (await rest.get(Routes.guild(gid))) as any;
+    logger.info({ guildId: gid, name: g?.name }, 'Verified bot is in target guild');
     return g;
   } catch (e: any) {
     const status = (e as any)?.status ?? (e as any)?.code;
@@ -184,15 +190,16 @@ async function diagnoseUserVisibility() {
   if (!env.VISIBILITY_CHECK_USER_ID) return;
   try {
     // Fetch roles and member to compute guild-level effective permissions
+    const gid = requireGuildId();
     const [roles, member, guild] = await Promise.all([
-      rest.get(Routes.guildRoles(env.GUILD_ID)) as Promise<any[]>,
-      rest.get(Routes.guildMember(env.GUILD_ID, env.VISIBILITY_CHECK_USER_ID)) as Promise<any>,
-      rest.get(Routes.guild(env.GUILD_ID)) as Promise<any>,
+      rest.get(Routes.guildRoles(gid)) as Promise<any[]>,
+      rest.get(Routes.guildMember(gid, env.VISIBILITY_CHECK_USER_ID)) as Promise<any>,
+      rest.get(Routes.guild(gid)) as Promise<any>,
     ]);
 
     const roleMap = new Map<string, any>();
     for (const r of roles) roleMap.set(r.id, r);
-    const everyoneRole = roleMap.get(env.GUILD_ID);
+    const everyoneRole = roleMap.get(requireGuildId());
     let perms = BigInt(everyoneRole?.permissions ?? '0');
     for (const rid of member.roles ?? []) {
       const r = roleMap.get(rid);
@@ -244,9 +251,10 @@ async function verifyCommandsPostDeploy() {
         'Fetched current GLOBAL commands (propagation may take up to 1 hour)'
       );
     } else if (scope === 'guild') {
-      const list = (await rest.get(Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID))) as any[];
+      const gid = requireGuildId();
+      const list = (await rest.get(Routes.applicationGuildCommands(env.CLIENT_ID, gid))) as any[];
       logger.info(
-        { count: list.length, names: list.map((c: any) => c.name), guildId: env.GUILD_ID },
+        { count: list.length, names: list.map((c: any) => c.name), guildId: gid },
         'Fetched current GUILD commands after deploy'
       );
       const expected = new Set(commands.map((c) => c.name));
@@ -256,13 +264,15 @@ async function verifyCommandsPostDeploy() {
         logger.warn({ missing }, 'Some commands are not present right after deploy');
       }
     } else if (scope === 'both') {
-      const g = (await rest.get(Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID))) as any[];
+      const gid = requireGuildId();
+      const g = (await rest.get(Routes.applicationGuildCommands(env.CLIENT_ID, gid))) as any[];
       const glob = (await rest.get(Routes.applicationCommands(env.CLIENT_ID))) as any[];
-      logger.info({ count: g.length, names: g.map((c: any) => c.name), guildId: env.GUILD_ID }, 'Fetched current GUILD commands');
+      logger.info({ count: g.length, names: g.map((c: any) => c.name), guildId: gid }, 'Fetched current GUILD commands');
       logger.info({ count: glob.length, names: glob.map((c: any) => c.name) }, 'Fetched current GLOBAL commands (propagation may take up to 1 hour)');
     } else if (scope === 'clear-guild') {
-      const g = (await rest.get(Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID))) as any[];
-      logger.info({ count: g.length, guildId: env.GUILD_ID }, 'After clear: GUILD commands count');
+      const gid = requireGuildId();
+      const g = (await rest.get(Routes.applicationGuildCommands(env.CLIENT_ID, gid))) as any[];
+      logger.info({ count: g.length, guildId: gid }, 'After clear: GUILD commands count');
     } else if (scope === 'clear-global') {
       const glob = (await rest.get(Routes.applicationCommands(env.CLIENT_ID))) as any[];
       logger.info({ count: glob.length }, 'After clear: GLOBAL commands count');
@@ -292,29 +302,32 @@ async function verifyCommandsPostDeploy() {
       const result = (await rest.put(Routes.applicationCommands(env.CLIENT_ID), { body: commands })) as any[];
       logger.info({ count: result?.length, names: result?.map((c) => c.name) }, 'Global commands upserted');
     } else if (scope === 'guild') {
-      logger.info(`Uploading ${commands.length} commands to guild ${env.GUILD_ID}...`);
+      const gid = requireGuildId();
+      logger.info(`Uploading ${commands.length} commands to guild ${gid}...`);
       const result = (await rest.put(
-        Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID),
+        Routes.applicationGuildCommands(env.CLIENT_ID, gid),
         { body: commands }
       )) as any[];
-      logger.info({ count: result?.length, names: result?.map((c) => c.name), guildId: env.GUILD_ID }, 'Guild commands upserted');
+      logger.info({ count: result?.length, names: result?.map((c) => c.name), guildId: gid }, 'Guild commands upserted');
     } else if (scope === 'both') {
-      logger.info(`Uploading ${commands.length} commands to guild ${env.GUILD_ID}...`);
+      const gid = requireGuildId();
+      logger.info(`Uploading ${commands.length} commands to guild ${gid}...`);
       const gRes = (await rest.put(
-        Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID),
+        Routes.applicationGuildCommands(env.CLIENT_ID, gid),
         { body: commands }
       )) as any[];
-      logger.info({ count: gRes?.length, names: gRes?.map((c) => c.name), guildId: env.GUILD_ID }, 'Guild commands upserted');
+      logger.info({ count: gRes?.length, names: gRes?.map((c) => c.name), guildId: gid }, 'Guild commands upserted');
       logger.info(`Uploading ${commands.length} commands globally...`);
       const globRes = (await rest.put(Routes.applicationCommands(env.CLIENT_ID), { body: commands })) as any[];
       logger.info({ count: globRes?.length, names: globRes?.map((c) => c.name) }, 'Global commands upserted');
     } else if (scope === 'clear-guild') {
-      logger.warn({ guildId: env.GUILD_ID }, 'Clearing ALL guild commands...');
+      const gid = requireGuildId();
+      logger.warn({ guildId: gid }, 'Clearing ALL guild commands...');
       const res = (await rest.put(
-        Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID),
+        Routes.applicationGuildCommands(env.CLIENT_ID, gid),
         { body: [] }
       )) as any[];
-      logger.info({ count: res?.length ?? 0, guildId: env.GUILD_ID }, 'Guild commands cleared');
+      logger.info({ count: res?.length ?? 0, guildId: gid }, 'Guild commands cleared');
     } else if (scope === 'clear-global') {
       logger.warn('Clearing ALL global commands...');
       const res = (await rest.put(Routes.applicationCommands(env.CLIENT_ID), { body: [] })) as any[];
