@@ -6,11 +6,11 @@ import { requireGuildId } from '../lib/context';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('achievements')
-    .setDescription('Shows user achievements and contributions.')
+    .setDescription('ユーザーの貢献・実績を表示')
     .addSubcommand(subcommand =>
       subcommand
         .setName('view')
-        .setDescription('Views the achievements of a user.')
+        .setDescription('指定ユーザーの実績を表示')
         .addUserOption(option => option.setName('user').setDescription('The user to view (defaults to yourself)'))
     ),
   async execute(interaction: CommandInteraction) {
@@ -44,20 +44,20 @@ module.exports = {
 
         const embed = new EmbedBuilder()
           .setColor('#FFD700')
-          .setTitle(`${targetUser.username}'s Contributions`)
+          .setTitle(`${targetUser.username} さんの貢献`)
           .setThumbnail(targetUser.displayAvatarURL())
           .addFields(
-            { name: 'Kudos Given', value: `**${kudosGiven}** times`, inline: true },
-            { name: 'Kudos Received', value: `**${kudosReceived}** times`, inline: true },
-            { name: 'Shifts Worked', value: `**${shiftCount}** times`, inline: true },
-            { name: 'Lost Items Reported', value: `**${itemsReported}** items`, inline: true }
+            { name: '送ったKudos', value: `**${kudosGiven}** 回`, inline: true },
+            { name: '受け取ったKudos', value: `**${kudosReceived}** 回`, inline: true },
+            { name: '担当シフト', value: `**${shiftCount}** 回`, inline: true },
+            { name: '落とし物の報告', value: `**${itemsReported}** 件`, inline: true }
           )
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
       } catch (error) {
         console.error('Achievements command error:', error);
-        await interaction.editReply({ content: 'An error occurred while fetching achievements.' });
+        await interaction.editReply({ content: '実績の取得中にエラーが発生しました。' });
       }
     }
   },

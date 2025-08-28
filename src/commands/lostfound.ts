@@ -5,12 +5,12 @@ import { requireGuildId } from '../lib/context';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('lostfound')
-    .setDescription('Manages lost and found items.')
+    .setDescription('落とし物を管理')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand(subcommand =>
       subcommand
         .setName('report')
-        .setDescription('Reports a new lost item.')
+        .setDescription('落とし物を報告')
         .addStringOption(option => option.setName('item').setDescription('The name of the item').setRequired(true))
         .addStringOption(option => option.setName('location').setDescription('Where the item was found').setRequired(true))
         .addAttachmentOption(option => option.setName('image').setDescription('A photo of the item').setRequired(false))
@@ -18,12 +18,12 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('list')
-        .setDescription('Lists all currently held lost items.')
+        .setDescription('保管中の落とし物一覧を表示')
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('claim')
-        .setDescription('Marks an item as claimed/returned.')
+        .setDescription('返却済みにする')
         .addStringOption(option => option.setName('id').setDescription('The ID of the item that was claimed').setRequired(true))
     ),
   async execute(interaction: CommandInteraction) {
@@ -50,7 +50,7 @@ module.exports = {
             status: 'IN_STORAGE',
           },
         });
-        await interaction.reply(`Reported lost item: **${itemName}**. Assigned ID: **${newItem.id}**`);
+        await interaction.reply(`落とし物を登録しました: **${itemName}**（ID: **${newItem.id}**）`);
       } else if (subcommand === 'list') {
         await interaction.deferReply();
         const items = await prisma.lostItem.findMany({
@@ -60,7 +60,7 @@ module.exports = {
         });
 
         if (items.length === 0) {
-          await interaction.editReply('No lost items have been reported.');
+          await interaction.editReply('保管中の落とし物はありません。');
           return;
         }
 
@@ -69,9 +69,9 @@ module.exports = {
                 .setColor('#E74C3C')
                 .setTitle(item.itemName)
                 .addFields(
-                    { name: 'Item ID', value: item.id, inline: true },
-                    { name: 'Found Location', value: item.foundLocation, inline: true },
-                    { name: 'Reported By', value: `<@${item.reportedById}>`, inline: true },
+                    { name: '管理ID', value: item.id, inline: true },
+                    { name: '発見場所', value: item.foundLocation, inline: true },
+                    { name: '報告者', value: `<@${item.reportedById}>`, inline: true },
                 )
                 .setTimestamp(item.createdAt);
 
@@ -101,14 +101,19 @@ module.exports = {
             // After prisma generate, this can be LostItemStatus.RETURNED
             data: { status: 'RETURNED' },
           });
-          await interaction.reply(`Item **${updatedItem.itemName}** (ID: ${itemId}) has been marked as claimed.`);
+          await interaction.reply(`「${updatedItem.itemName}」(ID: ${itemId}) を返却済みにしました。`);
         } catch (error) {
-          await interaction.reply({ content: `Could not find an item with ID "${itemId}".`, ephemeral: true });
+          await interaction.reply({ content: `ID「${itemId}」の落とし物が見つかりませんでした。`, ephemeral: true });
         }
       }
     } catch (error) {
       console.error('Lost & Found command error:', error);
-      await interaction.reply({ content: 'An error occurred while managing lost & found items.', ephemeral: true });
+      const payload = { content: 'An error occurred while managing lost & found items.', ephemeral: true } as const;
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(payload as any);
+      } else {
+        await interaction.reply(payload as any);
+      }
     }
   },
 };

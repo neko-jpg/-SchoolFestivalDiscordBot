@@ -6,11 +6,11 @@ import { parseTimeRange } from '../lib/time';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('shift')
-    .setDescription('Manages shifts using a database.')
+    .setDescription('当番シフトを管理（DB使用）')
     .addSubcommand(subcommand =>
       subcommand
         .setName('create')
-        .setDescription('Creates a new shift.')
+        .setDescription('新しいシフトを作成')
         .addStringOption(option => option.setName('name').setDescription('Name of the shift (e.g., Gate Guard)').setRequired(true))
         .addStringOption(option => option.setName('time').setDescription('Time slot (e.g., 10:00-12:00)').setRequired(true))
         .addStringOption(option => option.setName('location').setDescription('Location of the shift').setRequired(true))
@@ -18,12 +18,12 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('list')
-        .setDescription('Lists all shifts.')
+        .setDescription('シフト一覧を表示')
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('assign')
-        .setDescription('Assigns a user to a shift.')
+        .setDescription('ユーザーをシフトに割り当て')
         .addStringOption(option => option.setName('shiftid').setDescription('The ID of the shift to assign to').setRequired(true))
         .addUserOption(option => option.setName('user').setDescription('The user to assign').setRequired(true))
     ),
@@ -51,7 +51,7 @@ module.exports = {
             timezone: 'Asia/Tokyo',
           },
         });
-        await interaction.reply(`Shift "${newShift.name}" created with ID: **${newShift.id}**`);
+        await interaction.reply(`シフト「${newShift.name}」を作成しました（ID: **${newShift.id}**）`);
 
       } else if (subcommand === 'list') {
         const shifts = await prisma.shift.findMany({
@@ -60,7 +60,7 @@ module.exports = {
           orderBy: { startAt: 'asc' },
         });
         if (shifts.length === 0) {
-          await interaction.reply('No shifts have been created yet.');
+          await interaction.reply('まだシフトは作成されていません。');
           return;
         }
         const embed = new EmbedBuilder().setColor('#FFC300').setTitle('Shift Roster');
@@ -69,7 +69,7 @@ module.exports = {
           const assignees = (shift.members ?? []).map(m => m.user?.tag ?? m.userId).join(', ') || 'None';
           embed.addFields({
             name: `${shift.name} @ ${shift.location ?? 'TBD'} (${pad(shift.startAt)}-${pad(shift.endAt)})`,
-            value: `**ID:** ${shift.id}\n**Assigned:** ${assignees}`,
+            value: `**ID:** ${shift.id}\n**担当:** ${assignees}`,
           });
         });
         await interaction.reply({ embeds: [embed] });
@@ -85,13 +85,13 @@ module.exports = {
         });
 
         if (!shift) {
-            await interaction.reply({ content: `Shift with ID "${shiftId}" not found.`, ephemeral: true });
+            await interaction.reply({ content: `ID「${shiftId}」のシフトが見つかりませんでした。`, ephemeral: true });
             return;
         }
 
         // Check if user is already assigned
         if ((shift.members ?? []).some(m => m.userId === userToAssign.id)) {
-            await interaction.reply({ content: `${userToAssign.tag} is already assigned to this shift.`, ephemeral: true });
+            await interaction.reply({ content: `${userToAssign.tag} さんは既にこのシフトに割り当てられています。`, ephemeral: true });
             return;
         }
 
@@ -107,11 +107,11 @@ module.exports = {
           data: { shiftId: shiftId, userId: userToAssign.id, role: null, notes: null },
         });
 
-        await interaction.reply(`${userToAssign.tag} has been assigned to the "${shift.name}" shift.`);
+        await interaction.reply(`${userToAssign.tag} さんを「${shift.name}」シフトに割り当てました。`);
       }
     } catch (error) {
-      console.error('Prisma error in shift command:', error);
-      await interaction.reply({ content: 'There was an error while interacting with the database.', ephemeral: true });
+      console.error('シフトコマンドのDBエラー:', error);
+      await interaction.reply({ content: 'データベースとの通信中にエラーが発生しました。', ephemeral: true });
     }
   },
 };

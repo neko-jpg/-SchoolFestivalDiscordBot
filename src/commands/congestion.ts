@@ -75,7 +75,7 @@ module.exports = {
             reporterId: interaction.user.id,
           },
         });
-        await interaction.reply({ content: `Successfully reported **${location}** as level **${level}** congestion.`, ephemeral: true });
+        await interaction.reply({ content: `「${location}」の混雑度を **${level}** で報告しました。`, ephemeral: true });
       } else if (subcommand === 'view') {
         // --- Pre-flight Check for Assets ---
         const requiredAssets = [baseMapPath, ...Object.values(overlayImages)];
@@ -100,7 +100,7 @@ module.exports = {
         });
 
         if (latestReports.length === 0) {
-          await interaction.editReply('No congestion data available. The map is clear!');
+          await interaction.editReply('混雑データはまだありません（マップはクリアです）。');
           return;
         }
 
@@ -124,10 +124,14 @@ module.exports = {
       }
     } catch (error: any) {
       logger.error({ err: error, subcommand, user: interaction.user.id }, 'Congestion command failed');
-      if (error instanceof Error && error.message.includes('Input file is missing')) {
-          await interaction.followUp('Error: The map image file (`assets/map.png`) or dot images are missing on the server. Please contact an administrator.');
+      const content = (error instanceof Error && error.message.includes('Input file is missing'))
+        ? 'Error: The map image file (`assets/map.png`) or dot images are missing on the server. Please contact an administrator.'
+        : 'An error occurred while handling the congestion command.';
+      const payload = { content, ephemeral: true } as const;
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(payload as any);
       } else {
-          await interaction.followUp({ content: 'An error occurred while handling the congestion command.', ephemeral: true });
+        await interaction.reply(payload as any);
       }
     }
   },

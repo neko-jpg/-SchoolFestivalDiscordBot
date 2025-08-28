@@ -61,11 +61,11 @@ function formatDiffPreview(diff: DiffResult, templateName: string): EmbedBuilder
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('build')
-    .setDescription('Manages the server build based on a template.')
+    .setDescription('テンプレートにもとづきサーバー構成を更新')
     .addSubcommand(subcommand =>
       subcommand
         .setName('apply')
-        .setDescription('Applies a server template (shows a preview first).')
+        .setDescription('テンプレートを適用（事前プレビューあり）')
         .addStringOption(option =>
           option.setName('name')
             .setDescription('The name of the template to apply.')
@@ -78,7 +78,7 @@ module.exports = {
 
     if (interaction.options.getSubcommand() === 'apply') {
         const templateName = interaction.options.getString('name', true);
-        await interaction.reply({ content: `Request for template **${templateName}**. Analyzing...`, ephemeral: true });
+        await interaction.reply({ content: `テンプレート **${templateName}** の適用を準備中…`, ephemeral: true });
 
         let diff: DiffResult;
         let currentState: GuildState;
@@ -94,8 +94,8 @@ module.exports = {
             if (validationErrors.length > 0) {
                 const errorEmbed = new EmbedBuilder()
                     .setColor('#E74C3C')
-                    .setTitle('Validation Failed')
-                    .setDescription('The build cannot proceed due to the following errors:\n\n' + validationErrors.join('\n'));
+                    .setTitle('検証に失敗しました')
+                    .setDescription('以下の理由で実行できません。\n\n' + validationErrors.join('\n'));
                 await interaction.editReply({ embeds: [errorEmbed], components: [] });
                 return;
             }
@@ -103,8 +103,8 @@ module.exports = {
             const previewEmbed = formatDiffPreview(diff, templateName);
             const actionRow = new ActionRowBuilder<ButtonBuilder>()
                 .addComponents(
-                    new ButtonBuilder().setCustomId('build-confirm').setLabel('Apply Changes').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId('build-cancel').setLabel('Cancel').setStyle(ButtonStyle.Secondary)
+                    new ButtonBuilder().setCustomId('build-confirm').setLabel('適用する').setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId('build-cancel').setLabel('やめる').setStyle(ButtonStyle.Secondary)
                 );
 
             const response = await interaction.editReply({
@@ -117,7 +117,7 @@ module.exports = {
 
             collector.on('collect', async i => {
                 if (i.user.id !== interaction.user.id) {
-                    await i.reply({ content: 'You cannot use these buttons.', ephemeral: true });
+                    await i.reply({ content: 'このボタンを操作できるのは実行者のみです。', ephemeral: true });
                     return;
                 }
 
@@ -140,7 +140,7 @@ module.exports = {
                     }
 
                     try {
-                        await i.update({ content: 'Applying changes...', embeds: [], components: [] });
+                        await i.update({ content: '変更を適用しています…', embeds: [], components: [] });
 
                         const { buildRun, failures } = await executeBuild(i.guild, diff, currentState, templateName, i.user.id);
 
@@ -148,7 +148,7 @@ module.exports = {
                         if (buildRun?.id) {
                             const undoButton = new ButtonBuilder()
                                 .setCustomId(`build-undo-${buildRun.id}`)
-                                .setLabel('Undo')
+                                .setLabel('元に戻す')
                                 .setStyle(ButtonStyle.Danger);
                             const resultRow = new ActionRowBuilder<ButtonBuilder>().addComponents(undoButton);
                             componentsRows = [resultRow];

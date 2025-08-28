@@ -73,7 +73,7 @@ module.exports = {
 
             const transcript = modalInteraction.fields.getTextInputValue('transcriptInput');
 
-            const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
             const prompt = `あなたは優秀なアシスタントです。以下の会議の文字起こしテキストを、3つのセクション（決定事項、アクションアイテム、主要な議題）に分けて要約してください。\n\n---\n\n${transcript}`;
 
             const result = await model.generateContent(prompt);

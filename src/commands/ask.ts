@@ -35,17 +35,17 @@ async function getTokenizer() {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ask')
-    .setDescription('AI Help Desk')
+    .setDescription('AIヘルプデスク')
     .addSubcommand(subcommand =>
       subcommand
         .setName('question')
-        .setDescription('Ask a question to the AI assistant.')
+        .setDescription('AIに質問する（日本語で回答）')
         .addStringOption((option: SlashCommandStringOption) => option.setName('query').setDescription('Your question').setRequired(true))
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('remember')
-        .setDescription('Teach the AI new information (Admin only).')
+        .setDescription('AIに情報を覚えさせる（管理者のみ）')
         .addStringOption(option => option.setName('keyword').setDescription('A unique keyword for this information').setRequired(true))
         .addStringOption(option => option.setName('content').setDescription('The information to remember').setRequired(true))
     ),
@@ -59,7 +59,7 @@ module.exports = {
     try {
       if (subcommand === 'remember') {
         if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-            return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+            return interaction.reply({ content: 'このコマンドを実行する権限がありません。', ephemeral: true });
         }
         const keyword = interaction.options.getString('keyword', true);
         const content = interaction.options.getString('content', true);
@@ -70,11 +70,11 @@ module.exports = {
             create: { guildId: gid, keyword, content },
         });
 
-        await interaction.reply({ content: `I've remembered about "${keyword}".`, ephemeral: true });
+        await interaction.reply({ content: `「${keyword}」について記憶しました。`, ephemeral: true });
 
       } else if (subcommand === 'question') {
         if (!env.GEMINI_API_KEY) {
-            return interaction.reply({ content: 'The AI Help Desk is not configured. The `GEMINI_API_KEY` has not been set.', ephemeral: true });
+            return interaction.reply({ content: 'AIヘルプデスクの設定が不足しています。`GEMINI_API_KEY` を設定してください。', ephemeral: true });
         }
         await interaction.deferReply();
         const query = interaction.options.getString('query', true);
@@ -109,10 +109,10 @@ module.exports = {
           contextRecords = [];
         }
 
-        const context = contextRecords.map(r => `Keyword: ${r.keyword}\nContent: ${r.content}`).join('\n---\n');
+        const context = contextRecords.map(r => `キーワード: ${r.keyword}\n内容: ${r.content}`).join('\n---\n');
 
-        const model = genAI.getGenerativeModel({ model: "gemini-pro"});
-        const prompt = `Based on the following context, please answer the user's question. If the context is not relevant, use your general knowledge.\n\nCONTEXT:\n${context || 'No relevant context found.'}\n\nQUESTION:\n${query}`;
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
+        const prompt = `あなたは文化祭運営の日本語アシスタントです。必ず日本語で、簡潔かつ丁寧に回答してください。\n\n参考情報（あれば）:\n${context || '該当する参考情報は見つかりませんでした。'}\n\n質問:\n${query}`;
 
         const result = await model.generateContent(prompt);
         const answer = await result.response.text();
@@ -120,9 +120,9 @@ module.exports = {
         await interaction.editReply(answer);
       }
     } catch (error: any) {
-      logger.error({ err: error, subcommand, user: interaction.user.id }, 'AI Help Desk command failed.');
+      logger.error({ err: error, subcommand, user: interaction.user.id }, 'AIヘルプデスクでエラー');
       const msg = (error?.code ? `[${error.code}] ` : '') + (error?.message ?? String(error));
-      const replyPayload = { content: `AIヘルプデスクでエラーが発生しました:\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
+      const replyPayload = { content: `AIヘルプデスクでエラーが発生しました。\n\`\`\`\n${msg}\n\`\`\``, ephemeral: true };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(replyPayload);
       } else {

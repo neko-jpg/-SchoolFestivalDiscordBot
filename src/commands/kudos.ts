@@ -6,18 +6,18 @@ import { requireGuildId } from '../lib/context';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('kudos')
-    .setDescription('Give kudos to a team member.')
+    .setDescription('仲間に感謝のメッセージ（Kudos）を送る')
     .addSubcommand(subcommand =>
       subcommand
         .setName('give')
-        .setDescription('Give kudos to someone for their hard work.')
+        .setDescription('頑張っている仲間にKudosを送る')
         .addUserOption(option => option.setName('user').setDescription('The user to give kudos to').setRequired(true))
         .addStringOption(option => option.setName('message').setDescription('Your message of appreciation').setRequired(true))
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('top')
-        .setDescription('Shows the kudos leaderboard.')
+        .setDescription('Kudosのランキングを表示する')
     ),
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
@@ -32,7 +32,7 @@ module.exports = {
         const message = interaction.options.getString('message', true);
 
         if (targetUser.id === interaction.user.id) {
-          await interaction.reply({ content: 'You cannot give kudos to yourself!', ephemeral: true });
+          await interaction.reply({ content: '自分自身にKudosを送ることはできません。', ephemeral: true });
           return;
         }
 
@@ -53,9 +53,9 @@ module.exports = {
 
         const embed = new EmbedBuilder()
           .setColor('#FEE75C')
-          .setTitle(`👏 Kudos for ${targetUser.username}!`)
-          .setDescription(`**${interaction.user.username}** gave kudos to **${targetUser.username}**:`)
-          .addFields({ name: 'Message', value: message })
+          .setTitle(`👏 ${targetUser.username} さんへのKudos！`)
+          .setDescription(`**${interaction.user.username}** さんが **${targetUser.username}** さんへKudosを送りました:`)
+          .addFields({ name: 'メッセージ', value: message })
           .setThumbnail(targetUser.displayAvatarURL())
           .setTimestamp();
 
@@ -107,7 +107,7 @@ module.exports = {
       }
     } catch (error) {
       console.error('Kudos command error:', error);
-      await interaction.reply({ content: 'An error occurred while handling kudos.', ephemeral: true });
+      await interaction.reply({ content: 'Kudos処理中にエラーが発生しました。', ephemeral: true });
     }
   },
 };

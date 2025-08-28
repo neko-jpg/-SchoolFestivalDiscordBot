@@ -2,6 +2,7 @@
 import { Client, GatewayIntentBits, Collection, Interaction, Events } from 'discord.js';
 import fs from 'fs'; import path from 'path';
 import { env } from './env';
+import { tryConnectPrisma } from './prisma';
 import logger from './logger';
 import { disconnectPrisma } from './prisma';
 
@@ -20,7 +21,32 @@ const client = new Client({
 client.commands = new Collection<string, Command>();
 
 const commandsPath = path.join(__dirname, 'commands');
-logger.info({ commandsPath }, 'Scanning commands directory');
+logger.info({ commandsPath }, 'コマンドディレクトリをスキャン中');
+
+// --- DB到達性の簡易診断（起動時に一度だけ） ---
+try {
+  const dsn = process.env.DATABASE_URL;
+  if (dsn) {
+    const u = new URL(dsn);
+    const safe = {
+      protocol: u.protocol.replace(':',''),
+      host: u.hostname,
+      port: u.port || '(default)',
+      db: u.pathname.replace('/', ''),
+      params: [...u.searchParams.keys()].sort(),
+    };
+    logger.info({ database: safe }, 'DATABASE_URL を検出しました（パスワードは表示しません）');
+  } else {
+    logger.warn('DATABASE_URL が設定されていません');
+  }
+} catch (e) {
+  logger.warn({ e }, 'DATABASE_URL の解析に失敗しました');
+}
+
+(async () => {
+  const ok = await tryConnectPrisma(5000);
+  if (!ok) logger.warn('DBへの接続に失敗しました（5秒でタイムアウト）。一部コマンドは機能制限されます。');
+})();
 
 function isCommandFilename(name: string): boolean {
   const lower = name.toLowerCase();

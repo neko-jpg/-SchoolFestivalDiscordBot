@@ -38,7 +38,7 @@ module.exports = {
       const message = alertTemplates[alertType];
 
       if (message) {
-        await interaction.reply({ content: `Sending the following alert:\n\n${message}` , ephemeral: true });
+        await interaction.reply({ content: `次の緊急アラートを送信します:\n\n${message}` , ephemeral: true });
         // Using a more direct check to satisfy the type checker.
         if (interaction.channel && 'send' in interaction.channel) {
           await interaction.channel.send(message);

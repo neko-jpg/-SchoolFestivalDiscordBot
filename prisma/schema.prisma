@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,122 +7,138 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
-
 model User {
-  id           String       @id // Discord User ID
-  tag          String?
-  shiftMembers ShiftMember[]
+  id                           String             @id
+  tag                          String?
+  createdAt                    DateTime           @default(now())
+  CongestionReport             CongestionReport[]
+  Kudos_Kudos_fromUserIdToUser Kudos[]            @relation("Kudos_fromUserIdToUser")
+  Kudos_Kudos_toUserIdToUser   Kudos[]            @relation("Kudos_toUserIdToUser")
+  LostItem                     LostItem[]
+  shiftMembers                 ShiftMember[]
 }
 
 model Shift {
-  id       String       @id @default(cuid())
-  guildId  String
-  name     String
-  location String?
-  startAt  DateTime
-  endAt    DateTime
-  timezone String
-  members  ShiftMember[]
+  id        String        @id @default(cuid())
+  name      String
+  location  String?
+  createdAt DateTime      @default(now())
+  endAt     DateTime
+  guildId   String
+  startAt   DateTime
+  timezone  String?
+  members   ShiftMember[]
 
-  @@index([guildId])
+  @@index([guildId, startAt])
 }
 
 model ShiftMember {
-  id      String @id @default(cuid())
+  id      String  @id @default(cuid())
   shiftId String
   userId  String
   role    String?
   notes   String?
-  shift   Shift @relation(fields: [shiftId], references: [id])
-  user    User  @relation(fields: [userId], references: [id])
+  shift   Shift   @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([shiftId, userId])
+  @@index([userId])
 }
 
 model InventoryItem {
-  id          String @id @default(cuid())
-  guildId     String
+  id          String   @id @default(cuid())
   name        String
   description String?
   quantity    Int
-  checkouts   Json   @default("[]")
+  checkouts   Json     @default("[]")
+  createdAt   DateTime @default(now())
+  guildId     String
 
   @@unique([guildId, name])
+  @@index([guildId])
 }
 
 model Kudos {
-  id         String   @id @default(cuid())
-  guildId    String
-  fromUserId String
-  toUserId   String
-  message    String
-  createdAt  DateTime @default(now())
-}
+  id                          String   @id @default(cuid())
+  fromUserId                  String
+  toUserId                    String
+  message                     String
+  createdAt                   DateTime @default(now())
+  guildId                     String
+  User_Kudos_fromUserIdToUser User     @relation("Kudos_fromUserIdToUser", fields: [fromUserId], references: [id], onDelete: Cascade)
+  User_Kudos_toUserIdToUser   User     @relation("Kudos_toUserIdToUser", fields: [toUserId], references: [id], onDelete: Cascade)
 
-enum LostItemStatus {
-  IN_STORAGE // 保管中
-  RETURNED   // 返却済
+  @@index([guildId, createdAt])
 }
 
 model LostItem {
-  id            String        @id @default(cuid())
-  guildId       String
+  id            String         @id @default(cuid())
   itemName      String
   foundLocation String
   imageUrl      String?
   reportedById  String
-  status        LostItemStatus @default(IN_STORAGE)
   createdAt     DateTime       @default(now())
+  guildId       String
+  status        LostItemStatus @default(IN_STORAGE)
+  User          User           @relation(fields: [reportedById], references: [id], onDelete: SetNull)
+
+  @@index([guildId, status, createdAt])
 }
 
 model Knowledge {
   id        String   @id @default(cuid())
-  guildId   String
   keyword   String
   content   String
   createdAt DateTime @default(now())
+  guildId   String
 
   @@unique([guildId, keyword])
+  @@index([guildId])
 }
 
 model CongestionReport {
   id         String   @id @default(cuid())
-  guildId    String
   location   String
-  level      Int      // e.g., 1 for low, 2 for medium, 3 for high
+  level      Int
   reporterId String
   createdAt  DateTime @default(now())
+  guildId    String
+  User       User     @relation(fields: [reporterId], references: [id], onDelete: SetNull)
 
   @@index([guildId, location, createdAt])
 }
 
 model Template {
   id        String   @id @default(cuid())
-  name      String   @unique
+  name      String
   content   Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  guildId   String
+
+  @@unique([guildId, name])
+  @@index([guildId])
 }
 
 model BuildRun {
-  id           String   @id @default(cuid())
-  guildId      String
+  id           String         @id @default(cuid())
   templateName String
   dryRunResult Json
   snapshot     Json
-  status       String // PENDING, SUCCESS, FAILED, ROLLED_BACK
   executedBy   String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime       @default(now())
+  guildId      String
+  status       BuildRunStatus
+
+  @@index([guildId, createdAt])
 }
 
 model Segment {
   id          String   @id @default(cuid())
-  guildId     String
   name        String
   description String?
   conditions  Json
+  guildId     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -133,15 +146,23 @@ model Segment {
   @@index([guildId])
 }
 
-// 新しく追加
 model GuildConfig {
   id                String    @id @default(cuid())
-  guildId           String    @unique // DiscordサーバーのID
-
-  // ユーザーが設定する項目
-  reminderChannelId String?   // ? をつけて、設定がなくても良い項目にする
+  guildId           String    @unique
+  reminderChannelId String?
   festivalStartDate DateTime?
-
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+}
+
+enum LostItemStatus {
+  IN_STORAGE
+  RETURNED
+}
+
+enum BuildRunStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  ROLLED_BACK
 }
