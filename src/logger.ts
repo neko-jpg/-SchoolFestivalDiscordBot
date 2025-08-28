@@ -1,7 +1,8 @@
 import pino from 'pino';
+import { env } from './env';
 
 // Determine the logging transport based on the environment
-const transport = process.env.NODE_ENV === 'development'
+const transport = env.NODE_ENV === 'development'
   ? {
       target: 'pino-pretty',
       options: {
@@ -13,7 +14,7 @@ const transport = process.env.NODE_ENV === 'development'
   : undefined;
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
+  level: env.LOG_LEVEL,
   transport: transport,
 });
 
