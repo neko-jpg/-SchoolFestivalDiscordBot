@@ -52,10 +52,10 @@ export default {
             .setDescription('テンプレート名')
             .setRequired(true)
             .addChoices(
-              { name: 'bunkasai', value: 'bunkasai' },
-              { name: 'taiikusai', value: 'taiikusai' },
-              { name: 'kyugi', value: 'kyugi' },
-              { name: 'standard(json)', value: 'standard' }
+              { name: '文化祭', value: 'bunkasai' },
+              { name: '体育祭', value: 'taiikusai' },
+              { name: '球技大会', value: 'kyugi' },
+              { name: '標準', value: 'standard' }
             )
         )
         .addIntegerOption((option) => option.setName('grades').setDescription('学年数（3 または 4）').addChoices({ name: '3', value: 3 }, { name: '4', value: 4 }))

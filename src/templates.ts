@@ -29,7 +29,7 @@ function privateOpsOverwrites(): any[] {
 export function bunkasaiTemplate(grades: Grades): ServerTemplate {
   return {
     version: '1',
-    name: 'bunkasai',
+    name: '文化祭',
     roles: gradeRoles(grades),
     categories: [
       {
@@ -115,7 +115,7 @@ export function bunkasaiTemplate(grades: Grades): ServerTemplate {
 export function taiikusaiTemplate(grades: Grades): ServerTemplate {
   return {
     version: '1',
-    name: 'taiikusai',
+    name: '体育祭',
     roles: gradeRoles(grades),
     categories: [
       { name: 'role-setup', channels: [ { name: 'welcome', type: 'text' }, { name: 'rules', type: 'text', overwrites: announcementOverwrites() as any }, { name: 'select-grade', type: 'text' } ] },
@@ -133,7 +133,7 @@ export function taiikusaiTemplate(grades: Grades): ServerTemplate {
 export function kyugiTemplate(grades: Grades): ServerTemplate {
   return {
     version: '1',
-    name: 'kyugi',
+    name: '球技大会',
     roles: gradeRoles(grades),
     categories: [
       { name: 'role-setup', channels: [ { name: 'welcome', type: 'text' }, { name: 'rules', type: 'text', overwrites: announcementOverwrites() as any } ] },
